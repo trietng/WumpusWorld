@@ -101,7 +101,7 @@ class KnowledgeBase:
 
     
     # Solving problem using DBLL
-    def solve(self, current_clauses, model, symbols):
+    def dpll(self, current_clauses, model, symbols):
 
         visited=[]
         # model = {} # Assignment for each symbol
@@ -143,56 +143,55 @@ class KnowledgeBase:
             if(puredSymbols in symbols):
                 symbols.remove(puredSymbols)
             model[puredSymbols] = mark
-            return self.solve(current_clauses, model, symbols)
+            return self.dpll(current_clauses, model, symbols)
         
         unit_clauses, mark = self.extractUnitClauses(current_clauses)
         if mark != None:
             if(unit_clauses in symbols):
                 symbols.remove(unit_clauses)
             model[unit_clauses] = mark
-            return self.solve(current_clauses, model, symbols)
+            return self.dpll(current_clauses, model, symbols)
             
         symbol, mark = self.selection(current_clauses, symbols)
         if(symbol in symbols):
             symbols.remove(symbol)
         model[symbol]= mark
 
-        if self.solve(copy.deepcopy(current_clauses), copy.deepcopy(model), copy.deepcopy(symbols)):
+        if self.dpll(copy.deepcopy(current_clauses), copy.deepcopy(model), copy.deepcopy(symbols)):
             return True
         
         model[symbol]= -mark
-        return self.solve(current_clauses, model, symbols) 
+        return self.dpll(current_clauses, model, symbols) 
+    
+    def solve(self):
+        symbols = self.listSymbols(self.clauses)
+        return self.dpll(self.clauses, {}, symbols)
                 
 def test():
     # case 1: Successfully
     kb = KnowledgeBase(True, [{'S': 1, 'B': 0}, {'W': 1}, {'P': 1}, {'T': 1}, {'T':0, 'A': 0}])
-    symbols = kb.listSymbols(kb.clauses)
-    result = kb.solve(kb.clauses, {}, symbols)
+    result = kb.solve()
     assert(result == True)
     
     # case 2: There is contradition
     kb = KnowledgeBase(True, [{'S': 1, 'B': 0}, {'W': 1}, {'P': 1}, {'T': 1}, {'T':0}])
-    symbols = kb.listSymbols(kb.clauses)
-    result = kb.solve(kb.clauses, {}, symbols)
+    result = kb.solve()
     assert(result == False)
     
     # case 3: taken from https://fanpu.io/blog/2021/a-dpll-sat-solver/
     
     kb = KnowledgeBase(True, [{'x1': 0, 'x2': 0, 'x3':0}, {'x1': 1, 'x2': 1, 'x3':1}])
-    symbols = kb.listSymbols(kb.clauses)
-    result = kb.solve(kb.clauses, {}, symbols)
+    result = kb.solve()
     assert(result == True)
     
     # case 4: Also in https://fanpu.io/blog/2021/a-dpll-sat-solver/
     kb = KnowledgeBase(True, [{'x1': 1, 'x2': 0, 'x4':0}, {'x2': 1, 'x3': 0, 'x4':0}, {'x1': 0, 'x3': 1, 'x4':0}, {'x1': 0, 'x2': 1, 'x4':1}, {'x2': 0, 'x3': 1, 'x4':1}, {'x1': 1, 'x3': 0, 'x4':1},{'x1': 0, 'x2': 0, 'x3':0}, {'x1': 1, 'x2': 1, 'x3':1}])
-    symbols = kb.listSymbols(kb.clauses)
-    result = kb.solve(kb.clauses, {}, symbols)
+    result = kb.solve()
     assert(result == False)
     
     # case 5: Taken from https://www.cs.cornell.edu/courses/cs4860/2009sp/lec-04.pdf
     kb = KnowledgeBase(True, [{'p': 0, 'q': 0, 'r': 0, 's': 0}, {'p': 1, 'q': 0, 'r': 1}, {'q': 1, 'r': 1, 's': 0}, {'p': 0, 'q': 1, 'r': 0, 's': 0}, {'q': 0, 'r': 1, 's': 1}, {'p': 1, 'r': 1, 's': 0}, {'p': 1, 's': 1}, {'p': 0, 'q': 1}])
-    symbols = kb.listSymbols(kb.clauses)
-    result = kb.solve(kb.clauses, {}, symbols)
+    result = kb.solve()
     assert(result == True)
     
     # case 6: Test for del clause:
@@ -208,7 +207,7 @@ def test():
     result = True if {'x4': 1, 'x3': 1, 'x1': 0} in kb.clauses else False
     assert(result == False)
         
-    # case 6: Test for add clause:
+    # case 7: Test for add clause:
     kb = KnowledgeBase(True, [{'x1': 1, 'x2': 1, 'x3': 0}, {'x1': 1}, {'x4': 1, 'x3': 1, 'x1': 0}])
     
         # subtest: initially, the clause is not existed in the kb
