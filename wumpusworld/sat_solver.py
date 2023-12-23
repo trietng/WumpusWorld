@@ -102,7 +102,6 @@ class KnowledgeBase:
     
     # Solving problem using DBLL
     def dpll(self, current_clauses, model, symbols):
-
         visited=[]
         # model = {} # Assignment for each symbol
         # symbols = self.listSymbols(current_clauses)
@@ -164,6 +163,8 @@ class KnowledgeBase:
         return self.dpll(current_clauses, model, symbols) 
     
     def solve(self):
+        if not self.clauses:
+            return False
         symbols = self.listSymbols(self.clauses)
         return self.dpll(self.clauses, {}, symbols)
                 
@@ -231,8 +232,15 @@ def test():
     
     print(kb.clauses)
     
+    
+    
+    kb = KnowledgeBase(True, [])
+    a = kb.solve()
+    assert(a == False)
+    
+    print(a)
+    
     print("Passed all tests")
-
     
 test()
             
