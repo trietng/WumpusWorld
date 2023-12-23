@@ -16,7 +16,10 @@ class KnowledgeBase:
         
             
     def add_clause(self, clause):
+        if clause in self.clauses:
+            return False
         self.clauses.append(clause)
+        return True
         
     def del_clause(self, symbol):
         for clause in self.clauses:
@@ -186,7 +189,13 @@ def test():
     result = kb.solve(kb.clauses, {}, symbols)
     assert(result == False)
     
-    # case 5: Test for del clause:
+    # case 5: Taken from https://www.cs.cornell.edu/courses/cs4860/2009sp/lec-04.pdf
+    kb = KnowledgeBase(True, [{'p': 0, 'q': 0, 'r': 0, 's': 0}, {'p': 1, 'q': 0, 'r': 1}, {'q': 1, 'r': 1, 's': 0}, {'p': 0, 'q': 1, 'r': 0, 's': 0}, {'q': 0, 'r': 1, 's': 1}, {'p': 1, 'r': 1, 's': 0}, {'p': 1, 's': 1}, {'p': 0, 'q': 1}])
+    symbols = kb.listSymbols(kb.clauses)
+    result = kb.solve(kb.clauses, {}, symbols)
+    assert(result == True)
+    
+    # case 6: Test for del clause:
     kb = KnowledgeBase(True, [{'x1': 1, 'x2': 1, 'x3': 0}, {'x1': 1}, {'x4': 1, 'x3': 1, 'x1': 0}])
     
         # subtest: initially, the clause is existed in the kb
@@ -198,6 +207,30 @@ def test():
          # subtest: the clause is removed from the kb.
     result = True if {'x4': 1, 'x3': 1, 'x1': 0} in kb.clauses else False
     assert(result == False)
+        
+    # case 6: Test for add clause:
+    kb = KnowledgeBase(True, [{'x1': 1, 'x2': 1, 'x3': 0}, {'x1': 1}, {'x4': 1, 'x3': 1, 'x1': 0}])
+    
+        # subtest: initially, the clause is not existed in the kb
+    result = True if {'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0} in kb.clauses else False
+    assert(result == False)
+
+    kb.add_clause({'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0})
+    
+         # subtest: the clause is added to the kb.
+    result = True if {'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0} in kb.clauses else False
+    assert(result == True)
+    
+        # subtest: the recently added clause is removed to the kb.
+    kb.del_clause('x5')
+    result = True if {'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0} in kb.clauses else False
+    assert(result == False)
+    
+        # subtest: add existed clause:
+    isSuccessful = kb.add_clause({'x1': 1, 'x2': 1, 'x3': 0})
+    assert(isSuccessful == False)
+    
+    print(kb.clauses)
     
     print("Passed all tests")
 
