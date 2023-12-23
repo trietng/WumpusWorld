@@ -15,8 +15,16 @@ class KnowledgeBase:
         print("In progressing")
         
             
-    def addClause(self, clause):
+    def add_clause(self, clause):
         self.clauses.append(clause)
+        
+    def del_clause(self, symbol):
+        for clause in self.clauses:
+            if symbol in list(clause.keys()):
+                self.clauses.remove(clause)
+                return True
+        return False
+        
         
     # Pure symbols are symbols that always be positive (or negative) in the clause dictionary. This symbol should be replaced by a corresponding constant (positive
     # or negative) to enhance the performance of the SAT Solver Algorithm.
@@ -171,7 +179,28 @@ def test():
     symbols = kb.listSymbols(kb.clauses)
     result = kb.solve(kb.clauses, {}, symbols)
     assert(result == True)
+    
+    # case 4: Also in https://fanpu.io/blog/2021/a-dpll-sat-solver/
+    kb = KnowledgeBase(True, [{'x1': 1, 'x2': 0, 'x4':0}, {'x2': 1, 'x3': 0, 'x4':0}, {'x1': 0, 'x3': 1, 'x4':0}, {'x1': 0, 'x2': 1, 'x4':1}, {'x2': 0, 'x3': 1, 'x4':1}, {'x1': 1, 'x3': 0, 'x4':1},{'x1': 0, 'x2': 0, 'x3':0}, {'x1': 1, 'x2': 1, 'x3':1}])
+    symbols = kb.listSymbols(kb.clauses)
+    result = kb.solve(kb.clauses, {}, symbols)
+    assert(result == False)
+    
+    # case 5: Test for del clause:
+    kb = KnowledgeBase(True, [{'x1': 1, 'x2': 1, 'x3': 0}, {'x1': 1}, {'x4': 1, 'x3': 1, 'x1': 0}])
+    
+        # subtest: initially, the clause is existed in the kb
+    result = True if {'x4': 1, 'x3': 1, 'x1': 0} in kb.clauses else False
+    assert(result == True)
+
+    kb.del_clause('x4')
+    
+         # subtest: the clause is removed from the kb.
+    result = True if {'x4': 1, 'x3': 1, 'x1': 0} in kb.clauses else False
+    assert(result == False)
+    
     print("Passed all tests")
+
     
 test()
             
