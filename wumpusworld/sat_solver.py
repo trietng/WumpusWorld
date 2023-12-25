@@ -15,10 +15,11 @@ class KnowledgeBase:
         print("In progressing")
         
             
-    def add_clause(self, clause):
-        if clause in self.clauses:
-            return False
-        self.clauses.append(clause)
+    def add_clause(self, clauses):
+        for clause in clauses:
+            if clause in self.clauses:
+                return False
+            self.clauses.append(clause)
         return True
         
     def del_clause(self, symbol):
@@ -215,7 +216,7 @@ def test():
     result = True if {'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0} in kb.clauses else False
     assert(result == False)
 
-    kb.add_clause({'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0})
+    kb.add_clause([{'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0}])
     
          # subtest: the clause is added to the kb.
     result = True if {'x1': 1, 'x2': 1, 'x3': 0, 'x4':1, 'x5': 0} in kb.clauses else False
@@ -227,7 +228,7 @@ def test():
     assert(result == False)
     
         # subtest: add existed clause:
-    isSuccessful = kb.add_clause({'x1': 1, 'x2': 1, 'x3': 0})
+    isSuccessful = kb.add_clause([{'x1': 1, 'x2': 1, 'x3': 0}])
     assert(isSuccessful == False)
     
     print(kb.clauses)
