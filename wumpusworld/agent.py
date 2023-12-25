@@ -5,12 +5,13 @@ from enum import Enum
 from world import WumpusWorld as World
 from sat_solver import KnowledgeBase
 
+
 class Room:
-    def __init__(self, position, percept: str, parent=None):
+    def __init__(self, position, percept: str, parent=None, child=None):
         self.position = position
         self.percept = percept
         self.parent = parent
-        self.child = None
+        self.child = child
 
     @classmethod
     def __find_nearest(cls, room, percept, path: deque, visited: set):
@@ -18,14 +19,15 @@ class Room:
         if room is None or id(room) in visited:
             return False
         visited.add(id(room))
+        newroom = Room(room.position, room.percept, room.parent, room.child)
         if percept in room.percept:
-            path.append(room)
+            path.append(newroom)
             return True
         if cls.__find_nearest(room.parent, percept, path, visited):
-            path.appendleft(room)
+            path.appendleft(newroom)
             return True
         if cls.__find_nearest(room.child, percept, path, visited):
-            path.appendleft(room)
+            path.appendleft(newroom)
             return True
         return False
 
@@ -34,7 +36,17 @@ class Room:
         path = deque()
         self.__find_nearest(self, 'S', path, set())
         if len(path) > 0:
-            path.pop()
+            path.popleft()
+        if len(path) > 0:
+            path[0].parent = self
+            path[0].child = None
+        if len(path) > 1:
+            path[0].child = path[1]
+            for i in range(1, len(path) - 1):
+                path[i].parent = path[i - 1]
+                path[i].child = path[i + 1]
+            path[-1].parent = path[-2]
+            path[-1].child = None
         return path
 
     def find_nearest_breeze(self):
@@ -42,7 +54,17 @@ class Room:
         path = deque()
         self.__find_nearest(self, 'B', path, set())
         if len(path) > 0:
-            path.pop()
+            path.popleft()
+        if len(path) > 0:
+            path[0].parent = self
+            path[0].child = None
+        if len(path) > 1:
+            path[0].child = path[1]
+            for i in range(1, len(path) - 1):
+                path[i].parent = path[i - 1]
+                path[i].child = path[i + 1]
+            path[-1].parent = path[-2]
+            path[-1].child = None
         return path
 
     def __str__(self):
@@ -68,6 +90,7 @@ class Agent:
         self.current = Room(world.agent, '')
         self.visited = set()
         self.kb = KnowledgeBase(True, [])
+        self.golds = []
 
     def __is_wall(self, position: tuple):
         """Check if a given position is a wall."""
@@ -119,9 +142,50 @@ class Agent:
                 kb.add_clause([{f'P{adjacent}': 1}, {f'W{adjacent}': 1}])
 
     @classmethod
-    def __search(cls, room, path: deque, visited: set, explored: dict, world: World, kb: KnowledgeBase):
+    def remove_wumpus(cls, kb, symbol):
+        """Remove wumpus from the knowledge base."""
+        kb.del_clause(symbol)
+
+    @classmethod
+    def __kill_wumpus(cls, room, path: deque, visited: set, explored: dict, inventory: set, world: World,
+                      kb: KnowledgeBase):
+        """Internal method to kill the wumpus."""
+        adjacents = world.get_adjacents(room.position)
+        adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
+        print('x', adjacents)
+        killed = []
+        for adjacent in adjacents:
+            if not cls.infer(kb, {f'W{adjacent}': 1}):
+                if world.kill_wumpus(adjacent):
+                    cls.remove_wumpus(kb, f'W{adjacent}')
+                    room.percept = world[room.position]
+                    killed.append(adjacent)
+            else:
+                if not cls.infer(kb, {f'W{adjacent}': 0}):
+                    pass
+                else:
+                    if world.kill_wumpus(adjacent):
+                        cls.remove_wumpus(kb, f'W{adjacent}')
+                        room.percept = world[room.position]
+                        killed.append(adjacent)
+        if 'S' not in room.percept:
+            for x in killed:
+                adjacents = world.get_adjacents(x)
+                for adjacent in adjacents:
+                    explored.update({adjacent: False})
+                    visited.remove(adjacent)
+            explored.update({room.position: True})
+            visited.add(room.position)
+            cls.update(kb, room, adjacents)
+        room.child = Room(killed[0], world[killed[0]], room)
+        if cls.__search(room.child, path, visited, explored, inventory, world, kb):
+            path.appendleft(room)
+            return True
+
+    @classmethod
+    def __search(cls, room, path: deque, visited: set, explored: dict, inventory: set, world: World, kb: KnowledgeBase):
         """Internal method to search the world."""
-        # print(room.position, room.percept, room.parent.position if room.parent is not None else None)
+        print(room.position, room.percept, room.parent.position if room.parent is not None else None)
         if room is None:
             return False
         if 'W' in room.percept:
@@ -133,8 +197,11 @@ class Agent:
         if room.position == (1, 1):
             path.append(room)
             return True
+        if 'G' in room.percept:
+            room.percept = room.percept.replace('G', '')
+            world.pickup_gold(room.position)
+            inventory.add(room.position)
         adjacents = world.get_adjacents(room.position)
-        visited_adjacents = [adjacent for adjacent in adjacents if adjacent in visited]
         adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
         if room.position not in visited:
             visited.add(room.position)
@@ -164,11 +231,11 @@ class Agent:
                     else:
                         invalids.add(adjacent)
         adjacents = [adjacent for adjacent in adjacents if adjacent not in invalids]
-        backtrack = False
         if len(adjacents) == 0:
             if any(value is False for value in explored.values()):
-                adjacents = visited_adjacents
-                backtrack = True
+                if cls.__search(room.parent, path, visited, explored, inventory, world, kb):
+                    path.appendleft(room)
+                    return True
             else:
                 path.append(room)
                 stench_path = room.find_nearest_stench()
@@ -177,17 +244,16 @@ class Agent:
                 else:
                     breeze_path = room.find_nearest_breeze()
                     path.extend(breeze_path)
-                return True
+                room = path[-1]
+                if 'S' in room.percept:
+                    if cls.__kill_wumpus(room, path, visited, explored, inventory, world, kb):
+                        return True
         else:
             for adjacent in adjacents:
                 if adjacent not in explored:
                     explored.update({adjacent: False})
         room.child = Room(adjacents[0], world[adjacents[0]], room)
-        if backtrack:
-            index = adjacents.index(room.parent.position)
-            parent = adjacents[index]
-            room.child = Room(parent, world[parent], room)
-        if cls.__search(room.child, path, visited, explored, world, kb):
+        if cls.__search(room.child, path, visited, explored, inventory, world, kb):
             path.appendleft(room)
             return True
         return False
@@ -198,12 +264,16 @@ class Agent:
     def search(self):
         """Search the world."""
         path = deque()
-        self.__search(self.current, path, set(), {}, self.world, self.kb)
+        inventory = set()
+        explored = {}
+        visited = set()
+        self.__search(self.current, path, visited, explored, inventory, self.world, self.kb)
         return path
+
 
 WORLD = World('resources/maps/map1.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
-for i in v:
-    print(i.position, i.percept)
+# for i in v:
+#     print(i.position, i.percept, i.parent.position if i.parent is not None else None)
