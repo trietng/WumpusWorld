@@ -168,7 +168,7 @@ class KnowledgeBase:
             return False
         symbols = self.listSymbols(self.clauses)
         return self.dpll(self.clauses, {}, symbols)
-                
+
 def test():
     # case 1: Successfully
     kb = KnowledgeBase(True, [{'S': 1, 'B': 0}, {'W': 1}, {'P': 1}, {'T': 1}, {'T':0, 'A': 0}])
@@ -242,9 +242,9 @@ def test():
     print(a)
     
     print("Passed all tests")
-    
-test()
-            
+#
+# test()
+#
         
     
     
