@@ -14,7 +14,13 @@ class WumpusWorld:
         :param j: column index of the room
         :param stenches: a dictionary data structure to keep track of stenches
         """
-        signal = 'B' if world[i][j] == 'P' else 'S'
+        signal = ''
+        if 'W' in world[i][j]:
+            signal = 'S'
+        elif 'P' in world[i][j]:
+            print(world[i][j])
+            signal = 'B'
+        assert signal != '', 'Invalid percept'
         if i > 0:
             x, y = n - i + 1, j + 1
             if signal == 'S':
@@ -73,16 +79,11 @@ class WumpusWorld:
         stenches = {}
         for i in range(n):
             for j in range(n):
-                if world[i][j] == 'P':
+                if 'P' in world[i][j]:
                     cls.__set_adjecent_rooms(world, n, i, j, stenches)
-                elif world[i][j] == 'W':
+                elif 'W' in world[i][j]:
                     cls.__set_adjecent_rooms(world, n, i, j, stenches)
-                    x, y = n - i, j + 1
-                    if (x, y) not in stenches:
-                        stenches.update({(x, y): 1})
-                    else:
-                        stenches[(x, y)] += 1
-                elif world[i][j] == 'A':
+                elif 'A' in world[i][j]:
                     agent = n - i, j + 1
                     world[i][j] = world[i][j].replace('A', '')
         return n, world, agent, stenches
@@ -121,6 +122,12 @@ class WumpusWorld:
 
     def __str__(self):
         return f'N = {self.n}\n' + str(self.__world)
+
+    def pickup_gold(self, position):
+        if 'G' not in self[position]:
+            return False
+        self[position] = self[position].replace('G', '')
+        return True
 
     def kill_wumpus(self, position):
         if 'W' not in self[position]:

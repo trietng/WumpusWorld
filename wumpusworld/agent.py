@@ -56,7 +56,6 @@ class Agent:
         self.current = Room(world.agent, '')
         self.visited = set()
         self.kb = KnowledgeBase(True, [])
-        self.actions = []
 
     def __is_wall(self, position: tuple):
         """Check if a given position is a wall."""
@@ -153,9 +152,11 @@ class Agent:
                     else:
                         invalids.add(adjacent)
         adjacents = [adjacent for adjacent in adjacents if adjacent not in invalids]
+        backtrack = False
         if len(adjacents) == 0:
             if any(value is False for value in explored.values()):
                 adjacents = visited_adjacents
+                backtrack = True
             else:
                 return True
         else:
@@ -163,11 +164,19 @@ class Agent:
                 if adjacent not in explored:
                     explored.update({adjacent: False})
         room.children = [Room(adjacent, world[adjacent], room) for adjacent in adjacents]
+        if backtrack:
+            index = next((i for i, child in enumerate(room.children) if child.position == room.parent.position), None)
+            parent = room.children.pop(index)
+            room.children.sort(key=lambda x: x.percept)
+            room.children.insert(0, parent)
         for child in room.children:
             if cls.__search(child, path, visited, explored, world, kb):
                 path.appendleft(room)
                 return True
         return False
+
+    def __leap_of_faith(self, room, path: deque, world: World, kb: KnowledgeBase):
+        pass
 
     def search(self):
         """Search the world."""
@@ -175,7 +184,7 @@ class Agent:
         self.__search(self.current, path, set(), {}, self.world, self.kb)
         return path
 
-# WORLD = World('resources/maps/map1.txt')
-# print(WORLD)
-# agent = Agent(WORLD)
-# v = agent.search()
+WORLD = World('resources/maps/map1.txt')
+print(WORLD)
+agent = Agent(WORLD)
+v = agent.search()
