@@ -10,31 +10,43 @@ class Room:
         self.position = position
         self.percept = percept
         self.parent = parent
-        self.children = []
+        self.child = None
 
     @classmethod
-    def __find_nearest_stench(cls, room, path: deque, visited: set):
-        """Internal method to find the nearest stench cell from a given cell."""
-        if room is None or room.position in visited:
+    def __find_nearest(cls, room, percept, path: deque, visited: set):
+        """Internal method to find the nearest room with the input percept in it."""
+        if room is None or id(room) in visited:
             return False
-        visited.add(room.position)
-        if 'S' in room.percept:
+        visited.add(id(room))
+        if percept in room.percept:
             path.append(room)
             return True
-        for child in room.children:
-            if cls.__find_nearest_stench(child, path, visited):
-                path.appendleft(room)
-                return True
-        if cls.__find_nearest_stench(room.parent, path, visited):
+        if cls.__find_nearest(room.parent, percept, path, visited):
+            path.appendleft(room)
+            return True
+        if cls.__find_nearest(room.child, percept, path, visited):
             path.appendleft(room)
             return True
         return False
 
     def find_nearest_stench(self):
-        """Find the nearest stench cell from a given cell."""
+        """Find the nearest room with a stench from a given room."""
         path = deque()
-        self.__find_nearest_stench(self, path, set())
+        self.__find_nearest(self, 'S', path, set())
+        if len(path) > 0:
+            path.pop()
         return path
+
+    def find_nearest_breeze(self):
+        """Find the nearest room with a breeze from a given room."""
+        path = deque()
+        self.__find_nearest(self, 'B', path, set())
+        if len(path) > 0:
+            path.pop()
+        return path
+
+    def __str__(self):
+        return f'{self.position} {self.percept}'
 
 
 class Action(Enum):
@@ -109,7 +121,7 @@ class Agent:
     @classmethod
     def __search(cls, room, path: deque, visited: set, explored: dict, world: World, kb: KnowledgeBase):
         """Internal method to search the world."""
-        print(room.position, room.percept, room.parent.position if room.parent is not None else None)
+        # print(room.position, room.percept, room.parent.position if room.parent is not None else None)
         if room is None:
             return False
         if 'W' in room.percept:
@@ -158,21 +170,26 @@ class Agent:
                 adjacents = visited_adjacents
                 backtrack = True
             else:
+                path.append(room)
+                stench_path = room.find_nearest_stench()
+                if len(stench_path) > 0:
+                    path.extend(stench_path)
+                else:
+                    breeze_path = room.find_nearest_breeze()
+                    path.extend(breeze_path)
                 return True
         else:
             for adjacent in adjacents:
                 if adjacent not in explored:
                     explored.update({adjacent: False})
-        room.children = [Room(adjacent, world[adjacent], room) for adjacent in adjacents]
+        room.child = Room(adjacents[0], world[adjacents[0]], room)
         if backtrack:
-            index = next((i for i, child in enumerate(room.children) if child.position == room.parent.position), None)
-            parent = room.children.pop(index)
-            room.children.sort(key=lambda x: x.percept)
-            room.children.insert(0, parent)
-        for child in room.children:
-            if cls.__search(child, path, visited, explored, world, kb):
-                path.appendleft(room)
-                return True
+            index = adjacents.index(room.parent.position)
+            parent = adjacents[index]
+            room.child = Room(parent, world[parent], room)
+        if cls.__search(room.child, path, visited, explored, world, kb):
+            path.appendleft(room)
+            return True
         return False
 
     def __leap_of_faith(self, room, path: deque, world: World, kb: KnowledgeBase):
@@ -188,3 +205,5 @@ WORLD = World('resources/maps/map1.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
+for i in v:
+    print(i.position, i.percept)
