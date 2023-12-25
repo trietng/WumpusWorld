@@ -1,9 +1,19 @@
 class WumpusWorld:
     def __init__(self, path: str):
+        """Initialize the world.
+        :param path: path to the map file
+        """
         self.n, self.__world, self.agent, self.stenches = self.read_map(path)
 
     @classmethod
-    def set_adjecent_rooms(cls, world, n, i, j, stenches):
+    def __set_adjecent_rooms(cls, world, n: int, i: int, j: int, stenches: dict):
+        """Set percepts of adjacent rooms.
+        :param world: the world
+        :param n: size of the world
+        :param i: row index of the room
+        :param j: column index of the room
+        :param stenches: a dictionary data structure to keep track of stenches
+        """
         signal = 'B' if world[i][j] == 'P' else 'S'
         if i > 0:
             x, y = n - i + 1, j + 1
@@ -52,6 +62,10 @@ class WumpusWorld:
 
     @classmethod
     def read_map(cls, path: str):
+        """Read the map from file. Should be only called by the constructor.
+        :param path: path to the map file
+        :returns: a tuple of (n, world, agent, stenches)
+        """
         with open(path, 'r') as f:
             n = int(f.readline())
             world = [[room.replace('-', '') for room in f.readline().strip().replace(' ', '').split('.')] for _ in range(n)]
@@ -60,9 +74,9 @@ class WumpusWorld:
         for i in range(n):
             for j in range(n):
                 if world[i][j] == 'P':
-                    cls.set_adjecent_rooms(world, n, i, j, stenches)
+                    cls.__set_adjecent_rooms(world, n, i, j, stenches)
                 elif world[i][j] == 'W':
-                    cls.set_adjecent_rooms(world, n, i, j, stenches)
+                    cls.__set_adjecent_rooms(world, n, i, j, stenches)
                     x, y = n - i, j + 1
                     if (x, y) not in stenches:
                         stenches.update({(x, y): 1})
@@ -74,16 +88,34 @@ class WumpusWorld:
         return n, world, agent, stenches
 
     def row(self, item):
+        """Get a row of the world.
+        :param item: index of the row
+        :returns: an array of rooms
+        """
         return self.__world[self.n - item]
 
     def col(self, item):
+        """Get a column of the world.
+        :param item: index of the column
+        :returns: an array of rooms
+        """
         return [self.__world[self.n - i][item - 1] for i in range(1, self.n + 1)]
 
     def __getitem__(self, item):
+        """Get a room at position (x, y).
+        :param item: position of the room
+        :returns: a string representation of all percepts in the room
+        :raises AssertionError: if item is not a tuple of length 2
+        """
         assert isinstance(item, tuple) and len(item) == 2, 'Index must be a tuple of length 2'
         return self.__world[self.n - item[0]][item[1] - 1]
 
     def __setitem__(self, key, value):
+        """Set a room at position (x, y).
+        :param key: position of the room
+        :param value: a string representation of all percepts in the room
+        :raises AssertionError: if key is not a tuple of length 2
+        """
         assert isinstance(key, tuple) and len(key) == 2, 'Index must be a tuple of length 2'
         self.__world[self.n - key[0]][key[1] - 1] = value
 
@@ -95,27 +127,21 @@ class WumpusWorld:
             return False
         self[position] = self[position].replace('W', '')
         x, y = position
-        print(self.stenches)
         if x > 1 and (x - 1, y) in self.stenches:
-            print('nearby', (x - 1, y))
             self.stenches[(x - 1, y)] -= 1
             if self.stenches[(x - 1, y)] == 0:
                 self.stenches.pop((x - 1, y))
                 self[(x - 1, y)] = self[(x - 1, y)].replace('S', '')
         if x < self.n and (x + 1, y) in self.stenches:
-            print('nearby', (x + 1, y))
-            self.stenches[(x + 1, y)] -= 1
             if self.stenches[(x + 1, y)] == 0:
                 self.stenches.pop((x + 1, y))
                 self[(x + 1, y)] = self[(x + 1, y)].replace('S', '')
         if y > 1 and (x, y - 1) in self.stenches:
-            print('nearby', (x, y - 1))
             self.stenches[(x, y - 1)] -= 1
             if self.stenches[(x, y - 1)] == 0:
                 self.stenches.pop((x, y - 1))
                 self[(x, y - 1)] = self[(x, y - 1)].replace('S', '')
         if y < self.n and (x, y + 1) in self.stenches:
-            print('nearby', (x, y + 1))
             self.stenches[(x, y + 1)] -= 1
             if self.stenches[(x, y + 1)] == 0:
                 self.stenches.pop((x, y + 1))
@@ -123,6 +149,10 @@ class WumpusWorld:
         return True
 
     def get_adjacents(self, position):
+        """Get adjacent positions of a room.
+        :param position: position of the room
+        :returns: an array of valid adjacent positions
+        """
         adjacents = []
         x, y = position
         if y < self.n:
