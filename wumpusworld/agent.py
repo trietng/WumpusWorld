@@ -152,7 +152,6 @@ class Agent:
         """Internal method to kill the wumpus."""
         adjacents = world.get_adjacents(room.position)
         adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
-        print('x', adjacents)
         killed = []
         for adjacent in adjacents:
             if not cls.infer(kb, {f'W{adjacent}': 1}):
@@ -179,7 +178,6 @@ class Agent:
             cls.update(kb, room, adjacents)
         room.child = Room(killed[0], world[killed[0]], room)
         if cls.__search(room.child, path, visited, explored, inventory, world, kb):
-            path.appendleft(room)
             return True
 
     @classmethod
@@ -237,17 +235,22 @@ class Agent:
                     path.appendleft(room)
                     return True
             else:
-                path.append(room)
+                xpath = []
                 stench_path = room.find_nearest_stench()
                 if len(stench_path) > 0:
-                    path.extend(stench_path)
+                    xpath.extend(stench_path)
                 else:
                     breeze_path = room.find_nearest_breeze()
-                    path.extend(breeze_path)
-                room = path[-1]
+                    xpath.extend(breeze_path)
+                for e in xpath:
+                    print(e.position, e.percept, e.parent.position if e.parent is not None else None)
+                room = xpath[-1]
                 if 'S' in room.percept:
                     if cls.__kill_wumpus(room, path, visited, explored, inventory, world, kb):
+                        path.appendleft(room)
                         return True
+                elif 'B' in room.percept:
+                    pass
         else:
             for adjacent in adjacents:
                 if adjacent not in explored:
@@ -258,8 +261,10 @@ class Agent:
             return True
         return False
 
-    def __leap_of_faith(self, room, path: deque, world: World, kb: KnowledgeBase):
-        pass
+    def __leap_of_faith(self, room, path: deque, visited: set, explored: dict, inventory: set, world: World,
+                        kb: KnowledgeBase):
+        """Internal method to leap of faith."""
+
 
     def search(self):
         """Search the world."""
