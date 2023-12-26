@@ -140,6 +140,7 @@ class WumpusWorld:
                 self.stenches.pop((x - 1, y))
                 self[(x - 1, y)] = self[(x - 1, y)].replace('S', '')
         if x < self.n and (x + 1, y) in self.stenches:
+            self.stenches[(x + 1, y)] -= 1
             if self.stenches[(x + 1, y)] == 0:
                 self.stenches.pop((x + 1, y))
                 self[(x + 1, y)] = self[(x + 1, y)].replace('S', '')

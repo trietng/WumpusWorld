@@ -5,36 +5,70 @@ from enum import Enum
 from world import WumpusWorld as World
 from sat_solver import KnowledgeBase
 
+
 class Room:
-    def __init__(self, position, percept: str, parent=None):
+    def __init__(self, position, percept: str, parent=None, child=None):
         self.position = position
         self.percept = percept
         self.parent = parent
-        self.children = []
+        self.child = child
 
     @classmethod
-    def __find_nearest_stench(cls, room, path: deque, visited: set):
-        """Internal method to find the nearest stench cell from a given cell."""
-        if room is None or room.position in visited:
+    def __find_nearest(cls, room, percept, path: deque, visited: set):
+        """Internal method to find the nearest room with the input percept in it."""
+        if room is None or id(room) in visited:
             return False
-        visited.add(room.position)
-        if 'S' in room.percept:
-            path.append(room)
+        visited.add(id(room))
+        newroom = Room(room.position, room.percept, room.parent, room.child)
+        if percept in room.percept:
+            path.append(newroom)
             return True
-        for child in room.children:
-            if cls.__find_nearest_stench(child, path, visited):
-                path.appendleft(room)
-                return True
-        if cls.__find_nearest_stench(room.parent, path, visited):
-            path.appendleft(room)
+        if cls.__find_nearest(room.parent, percept, path, visited):
+            path.appendleft(newroom)
+            return True
+        if cls.__find_nearest(room.child, percept, path, visited):
+            path.appendleft(newroom)
             return True
         return False
 
     def find_nearest_stench(self):
-        """Find the nearest stench cell from a given cell."""
+        """Find the nearest room with a stench from a given room."""
         path = deque()
-        self.__find_nearest_stench(self, path, set())
+        self.__find_nearest(self, 'S', path, set())
+        if len(path) > 0:
+            path.popleft()
+        if len(path) > 0:
+            path[0].parent = self
+            path[0].child = None
+        if len(path) > 1:
+            path[0].child = path[1]
+            for i in range(1, len(path) - 1):
+                path[i].parent = path[i - 1]
+                path[i].child = path[i + 1]
+            path[-1].parent = path[-2]
+            path[-1].child = None
         return path
+
+    def find_nearest_breeze(self):
+        """Find the nearest room with a breeze from a given room."""
+        path = deque()
+        self.__find_nearest(self, 'B', path, set())
+        if len(path) > 0:
+            path.popleft()
+        if len(path) > 0:
+            path[0].parent = self
+            path[0].child = None
+        if len(path) > 1:
+            path[0].child = path[1]
+            for i in range(1, len(path) - 1):
+                path[i].parent = path[i - 1]
+                path[i].child = path[i + 1]
+            path[-1].parent = path[-2]
+            path[-1].child = None
+        return path
+
+    def __str__(self):
+        return f'{self.position} {self.percept}'
 
 
 class Action(Enum):
@@ -56,6 +90,7 @@ class Agent:
         self.current = Room(world.agent, '')
         self.visited = set()
         self.kb = KnowledgeBase(True, [])
+        self.golds = []
 
     def __is_wall(self, position: tuple):
         """Check if a given position is a wall."""
@@ -107,7 +142,46 @@ class Agent:
                 kb.add_clause([{f'P{adjacent}': 1}, {f'W{adjacent}': 1}])
 
     @classmethod
-    def __search(cls, room, path: deque, visited: set, explored: dict, world: World, kb: KnowledgeBase):
+    def remove_wumpus(cls, kb, symbol):
+        """Remove wumpus from the knowledge base."""
+        kb.del_clause(symbol)
+
+    @classmethod
+    def __kill_wumpus(cls, room, path: deque, visited: set, explored: dict, inventory: set, world: World,
+                      kb: KnowledgeBase):
+        """Internal method to kill the wumpus."""
+        adjacents = world.get_adjacents(room.position)
+        adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
+        killed = []
+        for adjacent in adjacents:
+            if not cls.infer(kb, {f'W{adjacent}': 1}):
+                if world.kill_wumpus(adjacent):
+                    cls.remove_wumpus(kb, f'W{adjacent}')
+                    room.percept = world[room.position]
+                    killed.append(adjacent)
+            else:
+                if not cls.infer(kb, {f'W{adjacent}': 0}):
+                    pass
+                else:
+                    if world.kill_wumpus(adjacent):
+                        cls.remove_wumpus(kb, f'W{adjacent}')
+                        room.percept = world[room.position]
+                        killed.append(adjacent)
+        if 'S' not in room.percept:
+            for x in killed:
+                adjacents = world.get_adjacents(x)
+                for adjacent in adjacents:
+                    explored.update({adjacent: False})
+                    visited.remove(adjacent)
+            explored.update({room.position: True})
+            visited.add(room.position)
+            cls.update(kb, room, adjacents)
+        room.child = Room(killed[0], world[killed[0]], room)
+        if cls.__search(room.child, path, visited, explored, inventory, world, kb):
+            return True
+
+    @classmethod
+    def __search(cls, room, path: deque, visited: set, explored: dict, inventory: set, world: World, kb: KnowledgeBase):
         """Internal method to search the world."""
         print(room.position, room.percept, room.parent.position if room.parent is not None else None)
         if room is None:
@@ -121,8 +195,11 @@ class Agent:
         if room.position == (1, 1):
             path.append(room)
             return True
+        if 'G' in room.percept:
+            room.percept = room.percept.replace('G', '')
+            world.pickup_gold(room.position)
+            inventory.add(room.position)
         adjacents = world.get_adjacents(room.position)
-        visited_adjacents = [adjacent for adjacent in adjacents if adjacent in visited]
         adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
         if room.position not in visited:
             visited.add(room.position)
@@ -152,39 +229,56 @@ class Agent:
                     else:
                         invalids.add(adjacent)
         adjacents = [adjacent for adjacent in adjacents if adjacent not in invalids]
-        backtrack = False
         if len(adjacents) == 0:
             if any(value is False for value in explored.values()):
-                adjacents = visited_adjacents
-                backtrack = True
+                if cls.__search(room.parent, path, visited, explored, inventory, world, kb):
+                    path.appendleft(room)
+                    return True
             else:
-                return True
+                xpath = []
+                stench_path = room.find_nearest_stench()
+                if len(stench_path) > 0:
+                    xpath.extend(stench_path)
+                else:
+                    breeze_path = room.find_nearest_breeze()
+                    xpath.extend(breeze_path)
+                for e in xpath:
+                    print(e.position, e.percept, e.parent.position if e.parent is not None else None)
+                room = xpath[-1]
+                if 'S' in room.percept:
+                    if cls.__kill_wumpus(room, path, visited, explored, inventory, world, kb):
+                        path.appendleft(room)
+                        return True
+                elif 'B' in room.percept:
+                    pass
         else:
             for adjacent in adjacents:
                 if adjacent not in explored:
                     explored.update({adjacent: False})
-        room.children = [Room(adjacent, world[adjacent], room) for adjacent in adjacents]
-        if backtrack:
-            index = next((i for i, child in enumerate(room.children) if child.position == room.parent.position), None)
-            parent = room.children.pop(index)
-            room.children.sort(key=lambda x: x.percept)
-            room.children.insert(0, parent)
-        for child in room.children:
-            if cls.__search(child, path, visited, explored, world, kb):
-                path.appendleft(room)
-                return True
+        room.child = Room(adjacents[0], world[adjacents[0]], room)
+        if cls.__search(room.child, path, visited, explored, inventory, world, kb):
+            path.appendleft(room)
+            return True
         return False
 
-    def __leap_of_faith(self, room, path: deque, world: World, kb: KnowledgeBase):
-        pass
+    def __leap_of_faith(self, room, path: deque, visited: set, explored: dict, inventory: set, world: World,
+                        kb: KnowledgeBase):
+        """Internal method to leap of faith."""
+
 
     def search(self):
         """Search the world."""
         path = deque()
-        self.__search(self.current, path, set(), {}, self.world, self.kb)
+        inventory = set()
+        explored = {}
+        visited = set()
+        self.__search(self.current, path, visited, explored, inventory, self.world, self.kb)
         return path
+
 
 WORLD = World('resources/maps/map1.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
+# for i in v:
+#     print(i.position, i.percept, i.parent.position if i.parent is not None else None)
