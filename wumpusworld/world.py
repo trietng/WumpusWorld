@@ -1,3 +1,13 @@
+from enum import Enum
+
+
+class Direction(Enum):
+    RIGHT = 1
+    DOWN = 2
+    LEFT = 3
+    UP = 4
+
+
 class WumpusWorld:
     def __init__(self, path: str):
         """Initialize the world.
@@ -74,7 +84,8 @@ class WumpusWorld:
         """
         with open(path, 'r') as f:
             n = int(f.readline())
-            world = [[room.replace('-', '') for room in f.readline().strip().replace(' ', '').split('.')] for _ in range(n)]
+            world = [[room.replace('-', '') for room in f.readline().strip().replace(' ', '').split('.')] for _ in
+                     range(n)]
         agent = None
         stenches = {}
         for i in range(n):
@@ -164,11 +175,11 @@ class WumpusWorld:
         adjacents = []
         x, y = position
         if y < self.n:
-            adjacents.append((x, y + 1))
+            adjacents.append((Direction.RIGHT, x, y + 1))
         if x > 1:
-            adjacents.append((x - 1, y))
+            adjacents.append((Direction.DOWN, x - 1, y))
         if y > 1:
-            adjacents.append((x, y - 1))
+            adjacents.append((Direction.LEFT, x, y - 1))
         if x < self.n:
-            adjacents.append((x + 1, y))
+            adjacents.append((Direction.UP, x + 1, y))
         return adjacents

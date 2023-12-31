@@ -2,83 +2,110 @@ from collections import deque
 from copy import deepcopy
 from enum import Enum
 from world import WumpusWorld as World
+from world import Direction
 from sat_solver import KnowledgeBase
 
 
+class Status(Enum):
+    UNSAFE = 1
+    SAFE = 2
+    EXPLORED = 3
+
+
 class Room:
-    def __init__(self, position, percept: str, parent=None, child=None):
-        self.position = position
+    def __init__(self, pos: tuple, wpos: tuple, percept, status: Status):
+        self.pos = pos
+        self.wpos = wpos
         self.percept = percept
-        self.parent = parent
-        self.child = child
+        self.status = status
 
-    @classmethod
-    def __find_nearest(cls, room, goal, path: deque, visited: set):
-        """Internal method to find the nearest room with the input percept in it."""
-        if room is None or id(room) in visited:
-            return False
-        visited.add(id(room))
-        newroom = Room(room.position, room.percept, room.parent, room.child)
-        if goal == 'BS':
-            if 'B' in room.percept and 'S' in room.percept:
-                path.appendleft(newroom)
-                return True
-        elif goal == 'B':
-            if 'B' in room.percept:
-                path.appendleft(newroom)
-                return True
-        elif goal == 'S':
-            if 'S' in room.percept:
-                path.appendleft(newroom)
-                return True
-        elif goal == 'E':
-            if room.position == (1, 1):
-                path.appendleft(newroom)
-                return True
-        if cls.__find_nearest(room.parent, goal, path, visited):
-            path.appendleft(newroom)
-            return True
-        if cls.__find_nearest(room.child, goal, path, visited):
-            path.appendleft(newroom)
-            return True
-        return False
 
-    def find_nearest(self, stench=False, breeze=False):
-        """Find the nearest room with a stench or breeze from a given room."""
-        assert stench or breeze, 'stench and breeze cannot be False at the same time'
-        path = deque()
-        if stench and breeze:
-            self.__find_nearest(self, 'BS', path, set())
-        elif stench:
-            self.__find_nearest(self, 'S', path, set())
-        elif breeze:
-            self.__find_nearest(self, 'B', path, set())
-        if len(path) > 0:
-            path.popleft()
-        if len(path) > 0:
-            path[0].parent = self
-            path[0].child = None
-        if len(path) > 1:
-            path[0].child = path[1]
-            for i in range(1, len(path) - 1):
-                path[i].parent = path[i - 1]
-                path[i].child = path[i + 1]
-            path[-1].parent = path[-2]
-            path[-1].child = None
-        return path
+class Map:
+    def __init__(self, world: World, start: Room):
+        self.__world = world
+        self.__data: list[list] = [[start]]
+        self.__offset = (0, 0)
+
+    def data(self):
+        return self.__data
+
+    def __getallocstate(self, position):
+        d = (position[0] + self.__offset[0], position[1] + self.__offset[1])
+        if d[0] >= len(self.__data) or d[1] >= len(self.__data[0]) or d[0] < 0 or d[1] < 0:
+            return 0
+        if self[position] is None:
+            return 1
+        return 2
+
+    def __getitem__(self, item):
+        d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
+        return self.__data[d[0]][d[1]]
+
+    def __setitem__(self, key, value):
+        d = (key[0] + self.__offset[0], key[1] + self.__offset[1])
+        self.__data[d[0]][d[1]] = value
+
+    def add(self, parent, direction, cwpos):
+        if direction == Direction.RIGHT:
+            cpos = (parent[0], parent[1] + 1)
+            if self.__getallocstate(cpos) == 0:
+                for row in self.__data:
+                    row.append(None)
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+            elif self.__getallocstate(cpos) == 1:
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+        elif direction == Direction.DOWN:
+            cpos = (parent[0] + 1, parent[1])
+            if self.__getallocstate(cpos) == 0:
+                self.__data.append([None for _ in range(len(self.__data[0]))])
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+            elif self.__getallocstate(cpos) == 1:
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+        elif direction == Direction.LEFT:
+            cpos = (parent[0], parent[1] - 1)
+            if self.__getallocstate(cpos) == 0:
+                for row in self.__data:
+                    row.insert(0, None)
+                self.__offset = (self.__offset[0], self.__offset[1] + 1)
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+            elif self.__getallocstate(cpos) == 1:
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+        elif direction == Direction.UP:
+            cpos = (parent[0] - 1, parent[1])
+            if self.__getallocstate(cpos) == 0:
+                self.__data.insert(0, [None for _ in range(len(self.__data[0]))])
+                self.__offset = (self.__offset[0] + 1, self.__offset[1])
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+            elif self.__getallocstate(cpos) == 1:
+                self[cpos] = Room(cpos, cwpos, None, Status.SAFE)
+
+    def get_nearby(self, position):
+        nearby = []
+        right = (position[0], position[1] + 1)
+        left = (position[0], position[1] - 1)
+        up = (position[0] - 1, position[1])
+        down = (position[0] + 1, position[1])
+        if self.__getallocstate(right) == 2:
+            nearby.append(self[right])
+        if self.__getallocstate(down) == 2:
+            nearby.append(self[down])
+        if self.__getallocstate(left) == 2:
+            nearby.append(self[left])
+        if self.__getallocstate(up) == 2:
+            nearby.append(self[up])
+        return nearby
+
+    def explore(self, position):
+        self[position].status = Status.EXPLORED
+
+    def is_explored(self):
+        return not any(room is not None and room.status == Status.SAFE for row in self.__data for room in row)
+
+    def position(self, actual_position):
+        return actual_position[0] - self.__world.agent[0], actual_position[1] - self.__world.agent[1]
 
     def __str__(self):
-        return f'{self.position} {self.percept}'
-
-    @classmethod
-    def remove_stenches(cls, path: list, target: list):
-        """Remove stenches from the rooms."""
-        for room in path:
-            pointer = room[0]
-            if pointer.position in target:
-                pointer.percept = pointer.percept.replace('S', '')
-                print('remove stench', pointer.position, pointer.percept)
-
+        return '\n'.join(['[' + ','.join([str(room) if room is not None else '(None, None, None)' for room in row]) + ']' for row in self.__data])
 
 
 class Action(Enum):
@@ -95,9 +122,12 @@ class Action(Enum):
 
 
 class Agent:
+    RECURSION_LIMIT = 100
+    RECURSION_COUNT = 0
+
     def __init__(self, world: World):
         self.world = world
-        self.current = Room(world.agent, '')
+        self.current = Room((0, 0), world.agent, 'A', Status.SAFE)
         self.visited = set()
         self.kb = KnowledgeBase(True, [])
         self.golds = []
@@ -114,42 +144,44 @@ class Agent:
         temp = deepcopy(kb)
         temp.add_clause([clause])
         result = temp.solve()
-        return result
+        return not result
 
     @classmethod
     def update(cls, kb, room, adjacents):
         """Update the knowledge base."""
         if 'P' in room.percept:
-            pit_clause = {f'P{room.position}': 0}
+            pit_clause = {f'P{room.pos}': 0}
         else:
-            pit_clause = {f'P{room.position}': 1}
+            pit_clause = {f'P{room.pos}': 1}
         kb.add_clause([pit_clause])
 
         if 'W' in room.percept:
-            wumpus_clause = {f'W{room.position}': 0}
+            wumpus_clause = {f'W{room.pos}': 0}
         else:
-            wumpus_clause = {f'W{room.position}': 1}
+            wumpus_clause = {f'W{room.pos}': 1}
         kb.add_clause([wumpus_clause])
 
         if 'B' in room.percept:
             # Breeze => Pup or Pdown or Pleft or Pright
             # not Breeze or Pup or Pdown or Pleft or Pright
-            breeze_clause = {f'B{room.position}': 1}
+            breeze_clause = {f'B{room.pos}': 1}
             for adjacent in adjacents:
-                breeze_clause.update({f'P{adjacent}': 0})
+                breeze_clause.update({f'P{adjacent.pos}': 0})
             kb.add_clause([breeze_clause])
 
         if 'S' in room.percept:
             # Stench => Wup or Wdown or Wleft or Wright
-            stench_clause = {f'S{room.position}': 1}
+            stench_clause = {f'S{room.pos}': 1}
             for adjacent in adjacents:
-                stench_clause.update({f'P{adjacent}': 1})
+                stench_clause.update({f'P{adjacent.pos}': 0})
             kb.add_clause([stench_clause])
 
         if room.percept == '':
             for adjacent in adjacents:
                 # not Padj and not Wadj
-                kb.add_clause([{f'P{adjacent}': 1}, {f'W{adjacent}': 1}])
+                kb.add_clause([{f'P{adjacent.pos}': 1}, {f'W{adjacent.pos}': 1}])
+                kb.del_clause(f'S{room.pos}')
+                kb.del_clause(f'B{room.pos}')
 
     @classmethod
     def remove_wumpus(cls, kb, symbol):
@@ -157,148 +189,137 @@ class Agent:
         kb.del_clause(symbol)
 
     @classmethod
-    def __kill_wumpus(cls, room, path: list, visited: set, explored: dict, inventory: set, world: World,
-                      kb: KnowledgeBase):
-        """Internal method to kill the wumpus."""
-        print(room.position, room.percept, room.parent.position if room.parent is not None else None)
-        action = None
-        adjacents = world.get_adjacents(room.position)
-        adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
-        if not cls.infer(kb, {f'W{adjacents[0]}': 1}):
-            if world.kill_wumpus(adjacents[0]):
-                cls.remove_wumpus(kb, f'W{adjacents[0]}')
-                room.percept = world[room.position]
-        elif cls.infer(kb, {f'W{adjacents[0]}': 0}):
-            if world.kill_wumpus(adjacents[0]):
-                cls.remove_wumpus(kb, f'W{adjacents[0]}')
-                room.percept = world[room.position]
-        if 'S' not in room.percept:
-            adjacents = world.get_adjacents(adjacents[0])
-            for adjacent in adjacents:
-                explored.update({adjacent: False})
-                visited.remove(adjacent)
-            explored.update({room.position: True})
-            visited.add(room.position)
-            Room.remove_stenches(path, adjacents)
-            cls.update(kb, room, adjacents)
-            action = Action.SHOOT
-        room.child = Room(adjacents[0], world[adjacents[0]], room)
-        if cls.__search(room.child, path, visited, explored, inventory, world, kb, action):
+    def __shoot(cls, room, path: deque, mem: Map, inventory: set, world: World,
+                kb: KnowledgeBase):
+        """Internal method to shoot the wumpus 1 (one) time."""
+        adjacents = mem.get_nearby(room.pos)
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
+        target = adjacents.pop(0)
+        scream = world.kill_wumpus(target.wpos)
+        room.percept = world[target.wpos]
+        sadjacents = [sadjacent for sadjacent in mem.get_nearby(target.pos) if sadjacent.pos != room.pos]
+        target.status = Status.EXPLORED
+        if scream:
+            cls.remove_wumpus(kb, f'W{target.pos}')
+            if 'S' not in room.percept:
+                for adjacent in adjacents:
+                    if adjacent.status == Status.UNSAFE:
+                        adjacent.status = Status.SAFE
+                cls.update(kb, room, mem.get_nearby(room.pos))
+        else:
+            for adjacent in sadjacents:
+                if not all(room for room in mem.get_nearby(adjacent.pos) if room.status == Status.EXPLORED):
+                    adjacent.status = Status.SAFE
+        target.status = Status.SAFE
+        if cls.__search(target, room, path, mem, inventory, world, kb):
             return True
 
     @classmethod
-    def __search(cls, room, path: list, visited: set, explored: dict, inventory: set, world: World, kb: KnowledgeBase, action=None):
+    def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase):
+        """Internal method to shoot the wumpus until it screams."""
+        adjacents = mem.get_nearby(room.pos)
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
+        target = None
+        for adjacent in adjacents:
+            target = adjacent
+            scream = world.kill_wumpus(target.wpos)
+            room.percept = world[target.wpos]
+            if scream:
+                cls.remove_wumpus(kb, f'W{target.pos}')
+                if 'S' not in room.percept:
+                    cls.update(kb, room, mem.get_nearby(room.pos))
+                    target.status = Status.SAFE
+                break
+        if cls.__search(target, room, path, mem, inventory, world, kb):
+            return True
+
+    @classmethod
+    def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, action=None):
         """Internal method to search the world."""
+        cls.RECURSION_COUNT += 1
+        if cls.RECURSION_COUNT >= cls.RECURSION_LIMIT:
+            return True
         if room is None:
             return False
-        path.append((room, room.position, deepcopy(room.percept)))
-        print(room.position, room.percept, room.parent.position if room.parent is not None else None)
+        room.percept = world[room.wpos]
+        path.append((room, room.wpos, deepcopy(room.percept)))
         if 'W' in room.percept:
             return True
         if 'P' in room.percept:
             return True
-        if room.position == (1, 1):
-            path.append(room)
-            return True
         if 'G' in room.percept:
             room.percept = room.percept.replace('G', '')
-            world.pickup_gold(room.position)
-            inventory.add(room.position)
-        adjacents = world.get_adjacents(room.position)
-        adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
-        if room.position not in visited:
-            visited.add(room.position)
+            world.pickup_gold(room.pos)
+            inventory.add(room.pos)
+        wadjacents = world.get_adjacents(room.wpos)
+        for wadjacent in wadjacents:
+            mem.add(room.pos, wadjacent[0], (wadjacent[1], wadjacent[2]))
+        adjacents = mem.get_nearby(room.pos)
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
+        if room.status != Status.EXPLORED:
             cls.update(kb, room, adjacents)
-        explored.update({room.position: True})
-        invalids = set()
+            room.status = Status.EXPLORED
         if 'B' in room.percept:
             for adjacent in adjacents:
-                if not cls.infer(kb, {f'P{adjacent}': 1}):
+                if cls.infer(kb, {f'P{adjacent.pos}': 1}):
                     cls.update(kb, room, adjacents)
-                    invalids.add(adjacent)
-                else:
-                    if cls.infer(kb, {f'P{adjacent}': 0}):
-                        invalids.add(adjacent)
-        adjacents = [adjacent for adjacent in adjacents if adjacent not in invalids]
-        invalids.clear()
+                    adjacent.status = Status.UNSAFE
+                elif not cls.infer(kb, {f'P{adjacent.pos}': 0}):
+                    adjacent.status = Status.UNSAFE
         if 'S' in room.percept:
             for adjacent in adjacents:
-                if not cls.infer(kb, {f'W{adjacent}': 1}):
+                if cls.infer(kb, {f'W{adjacent.wpos}': 1}):
                     cls.update(kb, room, adjacents)
-                    invalids.add(adjacent)
-                else:
-                    if cls.infer(kb, {f'W{adjacent}': 0}):
-                        invalids.add(adjacent)
-        adjacents = [adjacent for adjacent in adjacents if adjacent not in invalids]
-        if len(adjacents) == 0:
-            if any(value is False for value in explored.values()):
-                if cls.__search(room.parent, path, visited, explored, inventory, world, kb):
-                    return True
-            else:
-                xpath = []
-                stench_path = room.find_nearest(stench=True)
-                if len(stench_path) > 0:
-                    xpath.extend(stench_path)
-                else:
-                    stench_and_breeze_path = room.find_nearest(stench=True, breeze=True)
-                    if len(stench_and_breeze_path) > 0:
-                        xpath.extend(stench_and_breeze_path)
-                    else:
-                        breeze_path = room.find_nearest(breeze=True)
-                        if len(breeze_path) > 0:
-                            xpath.extend(breeze_path)
-                room = xpath[-1]
-                for room in xpath:
-                    path.append((room, room.position, deepcopy(room.percept)))
-                if 'S' in room.percept:
-                    if cls.__kill_wumpus(room, path, visited, explored, inventory, world, kb):
-                        return True
-                elif 'B' in room.percept:
-                    if cls.__leap_of_faith(room, path, visited, explored, inventory, world, kb):
-                        return True
-                return False
-        else:
+                    adjacent.status = Status.UNSAFE
+                elif not cls.infer(kb, {f'W{adjacent.pos}': 0}):
+                    adjacent.status = Status.UNSAFE
+        if room.percept == '':
             for adjacent in adjacents:
-                if adjacent not in explored:
-                    explored.update({adjacent: False})
+                adjacent.status = Status.SAFE
         if len(adjacents) == 0:
-            xpath = room.find_exit()
-            if len(xpath) > 0:
-                print(xpath)
-                for room in xpath:
-                    path.append((room, room.position, deepcopy(room.percept)))
-                return True
-            else:
+            if not mem.is_explored():
+                path.append((parent, parent.wpos, parent.percept))
                 return False
-        room.child = Room(adjacents[0], world[adjacents[0]], room)
-        if cls.__search(room.child, path, visited, explored, inventory, world, kb):
-            return True
+            else:
+                return True
+        else:
+            if 'S' in room.percept and 'B' in room.percept:
+                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb):
+                    return True
+            elif 'S' in room.percept:
+                if cls.__shoot(room, path, mem, inventory, world, kb):
+                    return True
+            elif 'B' in room.percept:
+                if mem.is_explored():
+                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb):
+                        return True
+                else:
+                    adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
+                    if len(adjacents) == 0:
+                        path.append((parent, parent.wpos, parent.percept))
+                        return False
+                    else:
+                        if cls.__search(adjacents[0], room, path, mem, inventory, world, kb):
+                            return True
+            else:
+                for adjacent in adjacents:
+                    if cls.__search(adjacent, room, path, mem, inventory, world, kb):
+                        return True
+        path.append((parent, parent.wpos, parent.percept))
         return False
-
-    def __leap_of_faith(self, room, path: list, visited: set, explored: dict, inventory: set, world: World,
-                        kb: KnowledgeBase):
-        """Internal method to leap of faith."""
-        adjacents = world.get_adjacents(room.position)
-        adjacents = [adjacent for adjacent in adjacents if adjacent not in visited]
-        room.child = Room(adjacents[0], world[adjacents[0]], room)
-        explored.update({adjacents[0]: False})
-        if self.__search(room.child, path, visited, explored, inventory, world, kb):
-            return True
-
 
     def search(self):
         """Search the world."""
-        path = []
+        path = deque()
         inventory = set()
-        explored = {}
-        visited = set()
-        self.__search(self.current, path, visited, explored, inventory, self.world, self.kb)
+        memory = Map(self.world, self.current)
+        self.__search(self.current, None, path, memory, inventory, self.world, self.kb)
         return path
 
 
-WORLD = World('resources/maps/map1.txt')
+WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
 for i in v:
-    print(i)
+    print(i[1])
