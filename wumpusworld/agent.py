@@ -257,7 +257,7 @@ class Agent:
         if 'P' in room.percept:
             return True
         if 'G' in room.percept:
-            room.percept = room.percept.replace('G', '')
+            room.percept = room.percept.replace('G', 'E')
             world.pickup_gold(room.pos)
             inventory.add(room.pos)
         wadjacents = world.get_adjacents(room.wpos)
@@ -498,13 +498,12 @@ class Agent:
                 if 'S' in room[0].percept:
                     stench_room.append(room[0])
             routine.append(room[0])
-            print(room[0].wpos, " ", room[0].percept)
         
         if goal: 
             path_to_exit = self.find_exit_path(memory, routine[-1], goal)
             path_to_exit.reverse()
             routine.extend(path_to_exit)
-            action = None
+            action = self.convert_to_motions(routine)
             return routine, action
         else: 
             print("===> This function is in progress. Try another map ^^ ")

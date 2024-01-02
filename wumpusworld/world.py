@@ -137,13 +137,13 @@ class WumpusWorld:
     def pickup_gold(self, position):
         if 'G' not in self[position]:
             return False
-        self[position] = self[position].replace('G', '')
+        self[position] = self[position].replace('G', 'E')
         return True
 
     def kill_wumpus(self, position):
         if 'W' not in self[position]:
             return False
-        self[position] = self[position].replace('W', '')
+        self[position] = self[position].replace('W', 'K')
         x, y = position
         if x > 1 and (x - 1, y) in self.stenches:
             self.stenches[(x - 1, y)] -= 1
