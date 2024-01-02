@@ -35,19 +35,15 @@ class Map:
     def __getallocstate(self, position):
         d = (position[0] + self.__offset[0], position[1] + self.__offset[1])
         if d[0] >= len(self.__data) or d[1] >= len(self.__data[0]) or d[0] < 0 or d[1] < 0:
-            # print(position, ": ", 0)
-            # print("d:  ", d[0], d[1])
-            # print("len data: ",  len(self.__data), "  ", len(self.__data[0]))
             return 0
         if self[position] is None:
-            # print(position, ": ", 1)
             return 1
         return 2
 
     def _getworldposition_(self, item):
         d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
         return d
-    
+
     def __getitem__(self, item):
         d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
         return self.__data[d[0]][d[1]]
@@ -96,7 +92,6 @@ class Map:
         left = (position[0], position[1] - 1)
         up = (position[0] - 1, position[1])
         down = (position[0] + 1, position[1])
-        # print("right: ", right, "left: ", left, "up: ", up, "down: ", down)
         if self.__getallocstate(right) == 2:
             nearby.append(self[right])
         if self.__getallocstate(down) == 2:
@@ -236,7 +231,7 @@ class Agent:
         for adjacent in adjacents:
             target = adjacent
             scream = world.kill_wumpus(target.wpos)
-            room.percept = world[target.wpos]
+            room.percept = world[room.wpos]
             if scream:
                 cls.remove_wumpus(kb, f'W{target.pos}')
                 if 'S' not in room.percept:
@@ -292,7 +287,7 @@ class Agent:
                 adjacent.status = Status.SAFE
         if len(adjacents) == 0:
             if not mem.is_explored():
-                path.append((parent, parent.wpos, parent.percept))
+                path.append((parent, parent.wpos, deepcopy(parent.percept)))
                 return False
             else:
                 return True
@@ -310,7 +305,7 @@ class Agent:
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
                     if len(adjacents) == 0:
-                        path.append((parent, parent.wpos, parent.percept))
+                        path.append((parent, parent.wpos, deepcopy(parent.percept)))
                         return False
                     else:
                         if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, motion):
@@ -319,50 +314,50 @@ class Agent:
                 for adjacent in adjacents:
                     if cls.__search(adjacent, room, path, mem, inventory, world, kb, motion):
                         return True
-        path.append((parent, parent.wpos, parent.percept))
+        path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
 
     def manhattan_heuristic(self, pos1, pos2):
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-    
+
     def find_exit_path(self, map: Map, agent_pos: Room, goal_pos: Room):
         '''
-        This function using A* search with Manhattan heuristic function to find out the shortest path for agent to 
+        This function using A* search with Manhattan heuristic function to find out the shortest path for agent to
         get the exit room, whenever it has discovered the whole map or there is no safe way to continue the discovery.
-        
-        Obviously, the input are the map that stored so far by the agent, the room that agent is standing in, and the goal 
-        position iff the agent has visited it before. Note that the agent only know the exit door if it has visited 
+
+        Obviously, the input are the map that stored so far by the agent, the room that agent is standing in, and the goal
+        position iff the agent has visited it before. Note that the agent only know the exit door if it has visited
         the exit room before, so in some cases the goal_pos is Unknown.
-        
+
         For safety, in the discovered process of the agent, if there is no any possible safe room to be explored and the agent has pass through
         the exit room, it prioritizes to go to the exit room instead of continue the exploration. If there is no any safe room
         but the agent has not go to the exit room before, it has to continue the exploration by go one step randomly.
-        
-        This returns the list of path in form of coordinations of room. 
+
+        This returns the list of path in form of coordinations of room.
         '''
-        
+
         frontier = PriorityQueue()
         frontier.put((self.manhattan_heuristic(map._getworldposition_(agent_pos.pos), map._getworldposition_(goal_pos.pos)), (0, agent_pos.pos)))
-        
+
         map_data = map.data()
-        
+
         visited = set()
         path = {}
         path[agent_pos] = None
-        
+
         while not frontier.empty():
             _, (cost, agent) = frontier.get_nowait()
-            
+
             agent = map.__getitem__(agent)
-            
+
             if agent == goal_pos:
                 break
-            
+
             if agent in visited:
                 continue
             visited.add(agent)
-            
-            
+
+
             raw_neighbors = map.get_nearby(agent.pos)
             neighbors = []
             for row in map_data:
@@ -370,44 +365,48 @@ class Agent:
                     if room in raw_neighbors:
                         if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept or 'E' in room.percept or 'K' in room.percept:
                             neighbors.append(room)
-                
+
             for neighbor in raw_neighbors:
                 if neighbor in visited:
                     continue
-                if neighbor in path: 
+                if neighbor in path:
                     continue
                 path[neighbor] = agent
                 frontier.put((cost + self.manhattan_heuristic(map._getworldposition_(neighbor.pos), map._getworldposition_(goal_pos.pos)) + 1, (cost + 1, neighbor.pos)))
-        
+
         routine = self.extract_final_path(path, goal_pos)
-        return routine 
-    
+        return routine
+
     def extract_final_path(self, path, goal):
         routine = []
-        
+
         pos = goal
-        
+
         while True:
-            if path[pos] == None: 
+            if path[pos] == None:
                 break
             routine.append(pos)
             pos = path[pos]
-        return routine 
-    
-    def convert_to_motions(self, path):    
+        return routine
+
+    def convert_to_motions(self, path):
         '''
         This function responsible for converting the path in coordination form into Motion and Action signals
         
         originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion in its discovered process. 
         
+        This function responsible for converting the path in coordination form into Motion signals
+
+        originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion.
+
         Now, it is converted into Motions signal by using a simple set of rules: if the current room is located on the
-        right hand-side of the next room (for example, current room is (4, 3) and next room is (4,2)), 
-        the signal of Motion is MOVE_LEFT. 
-        
+        right hand-side of the next room (for example, current room is (4, 3) and next room is (4,2)),
+        the signal of Motion is MOVE_LEFT.
+
         Similarly, we apply the rule for the rest of cases.
-        
-        This function return set of Motions in a list. 
-        
+
+        This function return set of Motions in a list.
+
         Recall the enum of motions annotation:
             MOVE_RIGHT = 0
             MOVE_UP = 1
@@ -419,9 +418,11 @@ class Agent:
             FALL_INTO_PIT = 7
             EATEN_BY_WUMPUS = 8
         '''
-        motions = [] 
+        motions = []
         gold_obtained = set()
         shooted_wumpus = set()
+        motions = []
+
         for i in range (1, len(path)):
             # Motion    
             if (path[i-1].pos)[0] < (path[i].pos)[0]:
@@ -468,7 +469,7 @@ class Agent:
                 motions.append(Action.FALL_INTO_PIT)
         
         return motions
-                
+
 
     def search(self):
         """Search the world."""
@@ -476,11 +477,11 @@ class Agent:
         inventory = set()
         memory = Map(self.world, self.current)
         self.__search(self.current, None, path, memory, inventory, self.world, self.kb)
-        
+
         # for m in memory.data():
         #     for room in m:
         #         print(room.pos, " with ", room.wpos)
-        
+
         routine = []
         goal = None
         stench_room = []
@@ -509,14 +510,16 @@ class Agent:
             print("===> This function is in progress. Try another map ^^ ")
             return None
             
-        
         # raw_neighbors = memory.get_nearby((10,3))
         # print("neighbors:  ", raw_neighbors)
-            
+
         # path_to_exit = self.find_exit_path(memory, routine[-1], goal)
         # path_to_exit.reverse()
         # routine.extend(path_to_exit)
-    
+
+
+        return routine
+
 
 WORLD = World('resources/maps/map2.txt')
 print(WORLD)
