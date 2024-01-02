@@ -323,6 +323,21 @@ class Agent:
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
     
     def find_exit_path(self, map: Map, agent_pos: Room, goal_pos: Room):
+        '''
+        This function using A* search with Manhattan heuristic function to find out the shortest path for agent to 
+        get the exit room, whenever it has discovered the whole map or there is no safe way to continue the discovery.
+        
+        Obviously, the input are the map that stored so far by the agent, the room that agent is standing in, and the goal 
+        position iff the agent has visited it before. Note that the agent only know the exit door if it has visited 
+        the exit room before, so in some cases the goal_pos is Unknown.
+        
+        For safety, in the discovered process of the agent, if there is no any possible safe room to be explored and the agent has pass through
+        the exit room, it prioritizes to go to the exit room instead of continue the exploration. If there is no any safe room
+        but the agent has not go to the exit room before, it has to continue the exploration by go one step randomly.
+        
+        This returns the list of path in form of coordinations of room. 
+        '''
+        
         frontier = PriorityQueue()
         frontier.put((self.manhattan_heuristic(map._getworldposition_(agent_pos.pos), map._getworldposition_(goal_pos.pos)), (0, agent_pos.pos)))
         
@@ -374,8 +389,47 @@ class Agent:
                 break
             routine.append(pos)
             pos = path[pos]
-        return routine    
+        return routine 
     
+    def convert_to_motions(self, path):    
+        '''
+        This function responsible for converting the path in coordination form into Motion signals
+        
+        originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion. 
+        
+        Now, it is converted into Motions signal by using a simple set of rules: if the current room is located on the
+        right hand-side of the next room (for example, current room is (4, 3) and next room is (4,2)), 
+        the signal of Motion is MOVE_LEFT. 
+        
+        Similarly, we apply the rule for the rest of cases.
+        
+        This function return set of Motions in a list. 
+        
+        Recall the enum of motions annotation:
+            MOVE_RIGHT = 0
+            MOVE_UP = 1
+            MOVE_LEFT = 2
+            MOVE_DOWN = 3
+            SHOOT = 4
+            GRAB = 5
+            CLIMB = 6
+            FALL_INTO_PIT = 7
+            EATEN_BY_WUMPUS = 8
+        '''
+        motions = [] 
+        for i in range (1, len(path)):
+            if path[i-1][0] < path[i][0]:
+                motions.append(Action.MOVE_UP)
+            elif path[i-1][0] > path[i-1][0]:
+                motions.append(Action.MOVE_DOWN)
+            elif path[i-1][1] < path[i-1][1]:
+                motions.append(Action.MOVE_RIGHT)
+            else:
+                motions.append(Action.MOVE_LEFT)
+        
+        return motions
+                
+
     def search(self):
         """Search the world."""
         path = deque()
