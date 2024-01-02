@@ -196,7 +196,7 @@ class Agent:
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
         target = adjacents.pop(0)
         scream = world.kill_wumpus(target.wpos)
-        room.percept = world[target.wpos]
+        room.percept = world[room.wpos]
         sadjacents = [sadjacent for sadjacent in mem.get_nearby(target.pos) if sadjacent.pos != room.pos]
         target.status = Status.EXPLORED
         if scream:
@@ -223,7 +223,7 @@ class Agent:
         for adjacent in adjacents:
             target = adjacent
             scream = world.kill_wumpus(target.wpos)
-            room.percept = world[target.wpos]
+            room.percept = world[room.wpos]
             if scream:
                 cls.remove_wumpus(kb, f'W{target.pos}')
                 if 'S' not in room.percept:
@@ -278,7 +278,7 @@ class Agent:
                 adjacent.status = Status.SAFE
         if len(adjacents) == 0:
             if not mem.is_explored():
-                path.append((parent, parent.wpos, parent.percept))
+                path.append((parent, parent.wpos, deepcopy(parent.percept)))
                 return False
             else:
                 return True
@@ -296,7 +296,7 @@ class Agent:
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
                     if len(adjacents) == 0:
-                        path.append((parent, parent.wpos, parent.percept))
+                        path.append((parent, parent.wpos, deepcopy(parent.percept)))
                         return False
                     else:
                         if cls.__search(adjacents[0], room, path, mem, inventory, world, kb):
@@ -305,7 +305,7 @@ class Agent:
                 for adjacent in adjacents:
                     if cls.__search(adjacent, room, path, mem, inventory, world, kb):
                         return True
-        path.append((parent, parent.wpos, parent.percept))
+        path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
 
     def search(self):
@@ -322,4 +322,5 @@ print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
 for i in v:
-    print(i[1])
+    print(i[0].wpos, i[0].percept)
+print(WORLD)
