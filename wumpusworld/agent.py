@@ -4,6 +4,8 @@ from enum import Enum
 from world import WumpusWorld as World
 from world import Direction
 from sat_solver import KnowledgeBase
+import math
+from queue import PriorityQueue
 
 
 class Status(Enum):
@@ -36,6 +38,10 @@ class Map:
         if self[position] is None:
             return 1
         return 2
+
+    def _getworldposition_(self, item):
+        d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
+        return d
 
     def __getitem__(self, item):
         d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
@@ -196,7 +202,7 @@ class Agent:
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
         target = adjacents.pop(0)
         scream = world.kill_wumpus(target.wpos)
-        room.percept = world[room.wpos]
+        room.percept = world[target.wpos]
         sadjacents = [sadjacent for sadjacent in mem.get_nearby(target.pos) if sadjacent.pos != room.pos]
         target.status = Status.EXPLORED
         if scream:
@@ -308,19 +314,155 @@ class Agent:
         path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
 
+    def manhattan_heuristic(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+    def find_exit_path(self, map: Map, agent_pos: Room, goal_pos: Room):
+        '''
+        This function using A* search with Manhattan heuristic function to find out the shortest path for agent to
+        get the exit room, whenever it has discovered the whole map or there is no safe way to continue the discovery.
+
+        Obviously, the input are the map that stored so far by the agent, the room that agent is standing in, and the goal
+        position iff the agent has visited it before. Note that the agent only know the exit door if it has visited
+        the exit room before, so in some cases the goal_pos is Unknown.
+
+        For safety, in the discovered process of the agent, if there is no any possible safe room to be explored and the agent has pass through
+        the exit room, it prioritizes to go to the exit room instead of continue the exploration. If there is no any safe room
+        but the agent has not go to the exit room before, it has to continue the exploration by go one step randomly.
+
+        This returns the list of path in form of coordinations of room.
+        '''
+
+        frontier = PriorityQueue()
+        frontier.put((self.manhattan_heuristic(map._getworldposition_(agent_pos.pos), map._getworldposition_(goal_pos.pos)), (0, agent_pos.pos)))
+
+        map_data = map.data()
+
+        visited = set()
+        path = {}
+        path[agent_pos] = None
+
+        while not frontier.empty():
+            _, (cost, agent) = frontier.get_nowait()
+
+            agent = map.__getitem__(agent)
+
+            if agent == goal_pos:
+                break
+
+            if agent in visited:
+                continue
+            visited.add(agent)
+
+
+            raw_neighbors = map.get_nearby(agent.pos)
+            neighbors = []
+            for row in map_data:
+                for room in row:
+                    if room in raw_neighbors:
+                        if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept:
+                            neighbors.append(room)
+
+            for neighbor in raw_neighbors:
+                if neighbor in visited:
+                    continue
+                if neighbor in path:
+                    continue
+                path[neighbor] = agent
+                frontier.put((cost + self.manhattan_heuristic(map._getworldposition_(neighbor.pos), map._getworldposition_(goal_pos.pos)) + 1, (cost + 1, neighbor.pos)))
+
+        routine = self.extract_final_path(path, goal_pos)
+        return routine
+
+    def extract_final_path(self, path, goal):
+        routine = []
+
+        pos = goal
+
+        while True:
+            if path[pos] == None:
+                break
+            routine.append(pos)
+            pos = path[pos]
+        return routine
+
+    def convert_to_motions(self, path):
+        '''
+        This function responsible for converting the path in coordination form into Motion signals
+
+        originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion.
+
+        Now, it is converted into Motions signal by using a simple set of rules: if the current room is located on the
+        right hand-side of the next room (for example, current room is (4, 3) and next room is (4,2)),
+        the signal of Motion is MOVE_LEFT.
+
+        Similarly, we apply the rule for the rest of cases.
+
+        This function return set of Motions in a list.
+
+        Recall the enum of motions annotation:
+            MOVE_RIGHT = 0
+            MOVE_UP = 1
+            MOVE_LEFT = 2
+            MOVE_DOWN = 3
+            SHOOT = 4
+            GRAB = 5
+            CLIMB = 6
+            FALL_INTO_PIT = 7
+            EATEN_BY_WUMPUS = 8
+        '''
+        motions = []
+        for i in range (1, len(path)):
+            if path[i-1][0] < path[i][0]:
+                motions.append(Action.MOVE_UP)
+            elif path[i-1][0] > path[i-1][0]:
+                motions.append(Action.MOVE_DOWN)
+            elif path[i-1][1] < path[i-1][1]:
+                motions.append(Action.MOVE_RIGHT)
+            else:
+                motions.append(Action.MOVE_LEFT)
+
+        return motions
+
+
     def search(self):
         """Search the world."""
         path = deque()
         inventory = set()
         memory = Map(self.world, self.current)
         self.__search(self.current, None, path, memory, inventory, self.world, self.kb)
-        return path
+
+        # for m in memory.data():
+        #     for room in m:
+        #         print(room.pos, " with ", room.wpos)
+
+        routine = []
+        goal = (1,1)
+        for room in path:
+            if (room[0].wpos == (1,1)):
+                goal = room[0]
+            routine.append(room[0])
+
+
+        # raw_neighbors = memory.get_nearby((10,3))
+        # print("neighbors:  ", raw_neighbors)
+
+        # path_to_exit = self.find_exit_path(memory, routine[-1], goal)
+        # path_to_exit.reverse()
+        # routine.extend(path_to_exit)
+
+        return routine
 
 
 WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
+count = 0
 for i in v:
-    print(i[0].wpos, i[0].percept)
-print(WORLD)
+    print(i.wpos)
+# for row in m.data():
+#     for room in row:
+#         print("room: ", room.wpos)
+#         count += 1
+# print("map size: ", count)
