@@ -1,3 +1,4 @@
+
 from collections import deque
 from copy import deepcopy
 from enum import Enum
@@ -130,6 +131,7 @@ class Action(Enum):
     CLIMB = 6
     FALL_INTO_PIT = 7
     EATEN_BY_WUMPUS = 8
+    SHOOT_MULTIPLE_TIMES = 9
 
 
 class Agent:
@@ -187,7 +189,7 @@ class Agent:
                 stench_clause.update({f'P{adjacent.pos}': 0})
             kb.add_clause([stench_clause])
 
-        if room.percept == '':
+        if room.percept == '' or room.percept == 'E' or room.percept == 'K':
             for adjacent in adjacents:
                 # not Padj and not Wadj
                 kb.add_clause([{f'P{adjacent.pos}': 1}, {f'W{adjacent.pos}': 1}])
@@ -201,7 +203,7 @@ class Agent:
 
     @classmethod
     def __shoot(cls, room, path: deque, mem: Map, inventory: set, world: World,
-                kb: KnowledgeBase):
+                kb: KnowledgeBase, motion: list):
         """Internal method to shoot the wumpus 1 (one) time."""
         adjacents = mem.get_nearby(room.pos)
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
@@ -222,11 +224,11 @@ class Agent:
                 if not all(room for room in mem.get_nearby(adjacent.pos) if room.status == Status.EXPLORED):
                     adjacent.status = Status.SAFE
         target.status = Status.SAFE
-        if cls.__search(target, room, path, mem, inventory, world, kb):
+        if cls.__search(target, room, path, mem, inventory, world, kb, motion):
             return True
 
     @classmethod
-    def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase):
+    def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, motion:list):
         """Internal method to shoot the wumpus until it screams."""
         adjacents = mem.get_nearby(room.pos)
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
@@ -241,11 +243,11 @@ class Agent:
                     cls.update(kb, room, mem.get_nearby(room.pos))
                     target.status = Status.SAFE
                 break
-        if cls.__search(target, room, path, mem, inventory, world, kb):
+        if cls.__search(target, room, path, mem, inventory, world, kb, motion):
             return True
 
     @classmethod
-    def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, action=None):
+    def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, action=None, motion = list):
         """Internal method to search the world."""
         cls.RECURSION_COUNT += 1
         if cls.RECURSION_COUNT >= cls.RECURSION_LIMIT:
@@ -253,6 +255,7 @@ class Agent:
         if room is None:
             return False
         room.percept = world[room.wpos]
+        
         path.append((room, room.wpos, deepcopy(room.percept)))
         if 'W' in room.percept:
             return True
@@ -284,7 +287,7 @@ class Agent:
                     adjacent.status = Status.UNSAFE
                 elif not cls.infer(kb, {f'W{adjacent.pos}': 0}):
                     adjacent.status = Status.UNSAFE
-        if room.percept == '':
+        if room.percept == '' or room.percept == 'E' or room.percept == 'K':
             for adjacent in adjacents:
                 adjacent.status = Status.SAFE
         if len(adjacents) == 0:
@@ -295,14 +298,14 @@ class Agent:
                 return True
         else:
             if 'S' in room.percept and 'B' in room.percept:
-                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb):
+                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb, motion):
                     return True
             elif 'S' in room.percept:
-                if cls.__shoot(room, path, mem, inventory, world, kb):
+                if cls.__shoot(room, path, mem, inventory, world, kb, motion):
                     return True
             elif 'B' in room.percept:
                 if mem.is_explored():
-                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb):
+                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, motion):
                         return True
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
@@ -310,11 +313,11 @@ class Agent:
                         path.append((parent, parent.wpos, parent.percept))
                         return False
                     else:
-                        if cls.__search(adjacents[0], room, path, mem, inventory, world, kb):
+                        if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, motion):
                             return True
             else:
                 for adjacent in adjacents:
-                    if cls.__search(adjacent, room, path, mem, inventory, world, kb):
+                    if cls.__search(adjacent, room, path, mem, inventory, world, kb, motion):
                         return True
         path.append((parent, parent.wpos, parent.percept))
         return False
@@ -365,7 +368,7 @@ class Agent:
             for row in map_data:
                 for room in row:
                     if room in raw_neighbors:
-                        if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept:
+                        if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept or 'E' in room.percept or 'K' in room.percept:
                             neighbors.append(room)
                 
             for neighbor in raw_neighbors:
@@ -393,9 +396,9 @@ class Agent:
     
     def convert_to_motions(self, path):    
         '''
-        This function responsible for converting the path in coordination form into Motion signals
+        This function responsible for converting the path in coordination form into Motion and Action signals
         
-        originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion. 
+        originally, path is list of room (in tuple of coordination) and already ordered follows the agent motion in its discovered process. 
         
         Now, it is converted into Motions signal by using a simple set of rules: if the current room is located on the
         right hand-side of the next room (for example, current room is (4, 3) and next room is (4,2)), 
@@ -417,15 +420,52 @@ class Agent:
             EATEN_BY_WUMPUS = 8
         '''
         motions = [] 
+        gold_obtained = set()
+        shooted_wumpus = set()
         for i in range (1, len(path)):
-            if path[i-1][0] < path[i][0]:
-                motions.append(Action.MOVE_UP)
-            elif path[i-1][0] > path[i-1][0]:
+            # Motion    
+            if (path[i-1].pos)[0] < (path[i].pos)[0]:
                 motions.append(Action.MOVE_DOWN)
-            elif path[i-1][1] < path[i-1][1]:
+            elif (path[i-1].pos)[0] > (path[i].pos)[0]:
+                motions.append(Action.MOVE_UP)
+            elif (path[i-1].pos)[1] < (path[i].pos)[1]:
                 motions.append(Action.MOVE_RIGHT)
             else:
                 motions.append(Action.MOVE_LEFT)
+                
+            #Action
+            if not path[i].percept:
+                continue
+            
+            if 'E' in path[i].percept and path[i].pos not in gold_obtained:
+                motions.append(Action.GRAB)
+                gold_obtained.add(path[i].pos)
+            
+            # Note: this action including the yelling of the wumpus after it is shooted
+            # if a room has both Breeze and Stench, it shoots until a wumpus is dead and go to that room. 
+            # temporary
+            if 'B' in path[i].percept:
+                if i != len(path) - 1:
+                    if not path[i+1].percept:
+                        continue
+                    if 'K' in path[i+1].percept and path[i+1].pos not in shooted_wumpus:    
+                        motions.append(Action.SHOOT_MULTIPLE_TIMES)
+                        shooted_wumpus.add(path[i+1].pos)
+            # if there is only stench in a room, it shoots once time. Regardless whether any wumpus is dead after be shot or not,
+            # the agent still ensure that the room is safe to go.
+            else:
+                if i != len(path) - 1:
+                    if not path[i+1].percept:
+                        continue
+                    if 'K' in path[i+1].percept and path[i+1].pos not in shooted_wumpus:    
+                        motions.append(Action.SHOOT)
+                        shooted_wumpus.add(path[i+1].pos)
+                    
+            if 'W' in path[i].percept:
+                motions.append(Action.EATEN_BY_WUMPUS)
+                
+            if 'P' in path[i].percept:
+                motions.append(Action.FALL_INTO_PIT)
         
         return motions
                 
@@ -442,31 +482,54 @@ class Agent:
         #         print(room.pos, " with ", room.wpos)
         
         routine = []
-        goal = (1,1)
+        goal = None
+        stench_room = []
+        stench_breeze_room = []
+        breeze_room = []
         for room in path:
-            if (room[0].wpos == (1,1)):
+            if (memory._getworldposition_(room[0].pos) == (1,1)):
                 goal = room[0]
+            if 'B' in room[0].percept and 'S' in room[0].percept:
+                stench_breeze_room.append(room[0])
+            else:
+                if 'B' in room[0].percept:
+                    breeze_room.append(room[0])
+                if 'S' in room[0].percept:
+                    stench_room.append(room[0])
             routine.append(room[0])
+            print(room[0].wpos, " ", room[0].percept)
+        
+        if goal: 
+            path_to_exit = self.find_exit_path(memory, routine[-1], goal)
+            path_to_exit.reverse()
+            routine.extend(path_to_exit)
+            action = None
+            return routine, action
+        else: 
+            print("===> This function is in progress. Try another map ^^ ")
+            return None
             
-            
+        
         # raw_neighbors = memory.get_nearby((10,3))
         # print("neighbors:  ", raw_neighbors)
             
         # path_to_exit = self.find_exit_path(memory, routine[-1], goal)
         # path_to_exit.reverse()
         # routine.extend(path_to_exit)
-        
-        return routine
-
     
 
 WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
-v = agent.search()
+routine, action = agent.search()
 count = 0
-for i in v:
-    print(i.wpos)
+if routine:
+    for i in routine:
+        print(i.wpos)
+if action:
+    for a in action:
+        print(a)        
+
 # for row in m.data():
 #     for room in row:
 #         print("room: ", room.wpos)
