@@ -4,6 +4,8 @@ from enum import Enum
 from world import WumpusWorld as World
 from world import Direction
 from sat_solver import KnowledgeBase
+import math
+from queue import PriorityQueue
 
 
 class Status(Enum):
@@ -32,11 +34,19 @@ class Map:
     def __getallocstate(self, position):
         d = (position[0] + self.__offset[0], position[1] + self.__offset[1])
         if d[0] >= len(self.__data) or d[1] >= len(self.__data[0]) or d[0] < 0 or d[1] < 0:
+            # print(position, ": ", 0)
+            # print("d:  ", d[0], d[1])
+            # print("len data: ",  len(self.__data), "  ", len(self.__data[0]))
             return 0
         if self[position] is None:
+            # print(position, ": ", 1)
             return 1
         return 2
 
+    def _getworldposition_(self, item):
+        d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
+        return d
+    
     def __getitem__(self, item):
         d = (item[0] + self.__offset[0], item[1] + self.__offset[1])
         return self.__data[d[0]][d[1]]
@@ -85,6 +95,7 @@ class Map:
         left = (position[0], position[1] - 1)
         up = (position[0] - 1, position[1])
         down = (position[0] + 1, position[1])
+        # print("right: ", right, "left: ", left, "up: ", up, "down: ", down)
         if self.__getallocstate(right) == 2:
             nearby.append(self[right])
         if self.__getallocstate(down) == 2:
@@ -308,18 +319,102 @@ class Agent:
         path.append((parent, parent.wpos, parent.percept))
         return False
 
+    def manhattan_heuristic(self, pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+    
+    def find_exit_path(self, map: Map, agent_pos: Room, goal_pos: Room):
+        frontier = PriorityQueue()
+        frontier.put((self.manhattan_heuristic(map._getworldposition_(agent_pos.pos), map._getworldposition_(goal_pos.pos)), (0, agent_pos.pos)))
+        
+        map_data = map.data()
+        
+        visited = set()
+        path = {}
+        path[agent_pos] = None
+        
+        while not frontier.empty():
+            _, (cost, agent) = frontier.get_nowait()
+            
+            agent = map.__getitem__(agent)
+            
+            if agent == goal_pos:
+                break
+            
+            if agent in visited:
+                continue
+            visited.add(agent)
+            
+            
+            raw_neighbors = map.get_nearby(agent.pos)
+            neighbors = []
+            for row in map_data:
+                for room in row:
+                    if room in raw_neighbors:
+                        if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept:
+                            neighbors.append(room)
+                
+            for neighbor in raw_neighbors:
+                if neighbor in visited:
+                    continue
+                if neighbor in path: 
+                    continue
+                path[neighbor] = agent
+                frontier.put((cost + self.manhattan_heuristic(map._getworldposition_(neighbor.pos), map._getworldposition_(goal_pos.pos)) + 1, (cost + 1, neighbor.pos)))
+        
+        routine = self.extract_final_path(path, goal_pos)
+        return routine 
+    
+    def extract_final_path(self, path, goal):
+        routine = []
+        
+        pos = goal
+        
+        while True:
+            if path[pos] == None: 
+                break
+            routine.append(pos)
+            pos = path[pos]
+        return routine    
+    
     def search(self):
         """Search the world."""
         path = deque()
         inventory = set()
         memory = Map(self.world, self.current)
         self.__search(self.current, None, path, memory, inventory, self.world, self.kb)
-        return path
+        
+        # for m in memory.data():
+        #     for room in m:
+        #         print(room.pos, " with ", room.wpos)
+        
+        routine = []
+        goal = (1,1)
+        for room in path:
+            if (room[0].wpos == (1,1)):
+                goal = room[0]
+            routine.append(room[0])
+            
+            
+        # raw_neighbors = memory.get_nearby((10,3))
+        # print("neighbors:  ", raw_neighbors)
+            
+        # path_to_exit = self.find_exit_path(memory, routine[-1], goal)
+        # path_to_exit.reverse()
+        # routine.extend(path_to_exit)
+        
+        return routine
 
+    
 
 WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
 v = agent.search()
+count = 0
 for i in v:
-    print(i[1])
+    print(i.wpos)
+# for row in m.data():
+#     for room in row:
+#         print("room: ", room.wpos)
+#         count += 1
+# print("map size: ", count)
