@@ -196,7 +196,7 @@ class Agent:
 
     @classmethod
     def __shoot(cls, room, path: deque, mem: Map, inventory: set, world: World,
-                kb: KnowledgeBase, motion: list):
+                kb: KnowledgeBase, shoot):
         """Internal method to shoot the wumpus 1 (one) time."""
         adjacents = mem.get_nearby(room.pos)
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
@@ -217,30 +217,33 @@ class Agent:
                 if not all(room for room in mem.get_nearby(adjacent.pos) if room.status == Status.EXPLORED):
                     adjacent.status = Status.SAFE
         target.status = Status.SAFE
-        if cls.__search(target, room, path, mem, inventory, world, kb, motion):
+        if cls.__search(target, room, path, mem, inventory, world, kb, shoot):
             return True
 
     @classmethod
-    def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, motion:list):
+    def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot):
         """Internal method to shoot the wumpus until it screams."""
         adjacents = mem.get_nearby(room.pos)
         adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
-        target = None
+        target = []
         for adjacent in adjacents:
-            target = adjacent
-            scream = world.kill_wumpus(target.wpos)
+            target.append(adjacent)
+            scream = world.kill_wumpus(target[-1].wpos)
             room.percept = world[room.wpos]
             if scream:
-                cls.remove_wumpus(kb, f'W{target.pos}')
+                cls.remove_wumpus(kb, f'W{target[-1].pos}')
                 if 'S' not in room.percept:
                     cls.update(kb, room, mem.get_nearby(room.pos))
-                    target.status = Status.SAFE
-                break
-        if cls.__search(target, room, path, mem, inventory, world, kb, motion):
+                    for t in target:
+                        t.status = Status.SAFE
+                    if room.wpos not in shoot:
+                        shoot[room.wpos] = [t.wpos for t in target]
+                    break
+        if cls.__search(target[-1], room, path, mem, inventory, world, kb, shoot):
             return True
 
     @classmethod
-    def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, action=None, motion = list):
+    def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot = None):
         """Internal method to search the world."""
         cls.RECURSION_COUNT += 1
         if cls.RECURSION_COUNT >= cls.RECURSION_LIMIT:
@@ -291,14 +294,14 @@ class Agent:
                 return True
         else:
             if 'S' in room.percept and 'B' in room.percept:
-                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb, motion):
+                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb, shoot):
                     return True
             elif 'S' in room.percept:
-                if cls.__shoot(room, path, mem, inventory, world, kb, motion):
+                if cls.__shoot_until_scream(room, path, mem, inventory, world, kb, shoot):
                     return True
             elif 'B' in room.percept:
                 if mem.is_explored():
-                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, motion):
+                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, shoot):
                         return True
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
@@ -306,11 +309,11 @@ class Agent:
                         path.append((parent, parent.wpos, deepcopy(parent.percept)))
                         return False
                     else:
-                        if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, motion):
+                        if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, shoot):
                             return True
             else:
                 for adjacent in adjacents:
-                    if cls.__search(adjacent, room, path, mem, inventory, world, kb, motion):
+                    if cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
                         return True
         path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
@@ -447,7 +450,7 @@ class Agent:
                     if not path[i+1].percept:
                         continue
                     if 'K' in path[i+1].percept and path[i+1].pos not in shooted_wumpus:    
-                        motions.append(Action.SHOOT_MULTIPLE_TIMES)
+                        motions.append(Action.SHOOT)
                         shooted_wumpus.add(path[i+1].pos)
             # if there is only stench in a room, it shoots once time. Regardless whether any wumpus is dead after be shot or not,
             # the agent still ensure that the room is safe to go.
@@ -473,7 +476,8 @@ class Agent:
         path = deque()
         inventory = set()
         memory = Map(self.world, self.current)
-        self.__search(self.current, None, path, memory, inventory, self.world, self.kb)
+        shoot = {}
+        self.__search(self.current, None, path, memory, inventory, self.world, self.kb, shoot)
 
         # for m in memory.data():
         #     for room in m:
@@ -501,10 +505,7 @@ class Agent:
             path_to_exit.reverse()
             routine.extend(path_to_exit)
             action = self.convert_to_motions(routine)
-            return routine, action
-        else: 
-            print("===> This function is in progress. Try another map ^^ ")
-            return None
+            return routine, action, shoot
             
         # raw_neighbors = memory.get_nearby((10,3))
         # print("neighbors:  ", raw_neighbors)
@@ -514,19 +515,20 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-        return routine
-
-
 WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
-routine, action = agent.search()
+routine, actionk, shoot = agent.search()
 count = 0
 if routine:
     for i in routine:
-        print(i.wpos)
-if action:
-    for a in action:
+        action = [i.wpos]
+        if i.wpos in shoot:
+            action.append(shoot[i.wpos]) 
+            del shoot[i.wpos]
+        print(action)
+if actionk:
+    for a in actionk:
         print(a)        
 
 # for row in m.data():
