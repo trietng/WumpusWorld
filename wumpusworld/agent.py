@@ -1,4 +1,3 @@
-
 from collections import deque
 from copy import deepcopy
 from enum import Enum
@@ -7,7 +6,6 @@ from world import Direction
 from sat_solver import KnowledgeBase
 import math
 from queue import PriorityQueue
-
 
 class Status(Enum):
     UNSAFE = 1
@@ -337,14 +335,13 @@ class Agent:
         '''
 
         frontier = PriorityQueue()
-        frontier.put((self.manhattan_heuristic(map._getworldposition_(agent_pos.pos), map._getworldposition_(goal_pos.pos)), (0, agent_pos.pos)))
+        frontier.put((self.manhattan_heuristic(agent_pos.wpos, goal_pos.wpos), (0, agent_pos.pos)))
 
         map_data = map.data()
 
         visited = set()
         path = {}
         path[agent_pos] = None
-
         while not frontier.empty():
             _, (cost, agent) = frontier.get_nowait()
 
@@ -363,26 +360,26 @@ class Agent:
             for row in map_data:
                 for room in row:
                     if room in raw_neighbors:
-                        if room.percept == None or room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept or 'E' in room.percept or 'K' in room.percept:
-                            neighbors.append(room)
+                        if room.percept != None:
+                            if room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept or 'E' in room.percept or 'K' in room.percept:
+                                neighbors.append(room)
 
-            for neighbor in raw_neighbors:
+            for neighbor in neighbors:
                 if neighbor in visited:
                     continue
-                if neighbor in path:
-                    continue
                 path[neighbor] = agent
-                frontier.put((cost + self.manhattan_heuristic(map._getworldposition_(neighbor.pos), map._getworldposition_(goal_pos.pos)) + 1, (cost + 1, neighbor.pos)))
-
+                frontier.put((cost + self.manhattan_heuristic(neighbor.wpos, goal_pos.wpos) + 1, (cost + 1, neighbor.pos)))
         routine = self.extract_final_path(path, goal_pos)
+
         return routine
 
     def extract_final_path(self, path, goal):
         routine = []
 
         pos = goal
-
         while True:
+            if pos not in path:
+                break
             if path[pos] == None:
                 break
             routine.append(pos)
@@ -488,7 +485,7 @@ class Agent:
         stench_breeze_room = []
         breeze_room = []
         for room in path:
-            if (memory._getworldposition_(room[0].pos) == (1,1)):
+            if (room[0].wpos == (1,1)):
                 goal = room[0]
             if 'B' in room[0].percept and 'S' in room[0].percept:
                 stench_breeze_room.append(room[0])
