@@ -382,7 +382,7 @@ class Agent:
             pos = path[pos]
         return routine
 
-    def convert_to_motions(self, path):
+    def convert_to_motions(self, path, shooted):
         '''
         This function responsible for converting the path in coordination form into Motion and Action signals
         
@@ -417,12 +417,11 @@ class Agent:
         motions = []
 
         for i in range (1, len(path)):
-            if path[i].percept:
-                if 'K' in path[i].percept and path[i].wpos not in shooted_wumpus:
-                    motions.append(Action.SHOOT)
-                    shooted_wumpus.add(path[i].wpos)
-                    
             
+            if path[i-1].wpos in shooted and path[i-1].wpos not in shooted_wumpus:
+                shooted_wumpus.add(path[i-1].wpos)
+                motions.append(Action.SHOOT)
+
             # Motion    
             if (path[i-1].pos)[0] < (path[i].pos)[0]:
                 motions.append(Action.MOVE_DOWN)
@@ -436,7 +435,6 @@ class Agent:
             #Action
             if not path[i].percept: 
                 continue
-            
             if 'E' in path[i].percept and path[i].pos not in gold_obtained:
                 motions.append(Action.GRAB)
                 gold_obtained.add(path[i].pos)
@@ -498,7 +496,7 @@ class Agent:
             path_to_exit = self.find_exit_path(memory, routine[-1], goal)
             path_to_exit.reverse()
             routine.extend(path_to_exit)
-            action = self.convert_to_motions(routine)
+            action = self.convert_to_motions(routine, shoot)
             return routine, action, shoot
         
         else:
@@ -513,7 +511,7 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-WORLD = World('resources/maps/map3.txt')
+WORLD = World('resources/maps/map2.txt')
 print(WORLD)
 agent = Agent(WORLD)
 routine, actionk, shoot = agent.search()
