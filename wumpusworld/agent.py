@@ -511,21 +511,21 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-WORLD = World('resources/maps/map2.txt')
-print(WORLD)
-agent = Agent(WORLD)
-routine, actionk, shoot = agent.search()
-count = 0
-if routine:
-    for i in routine:
-        action = [i.wpos]
-        if i.wpos in shoot:
-            action.append(shoot[i.wpos]) 
-            del shoot[i.wpos]
-        print(action)
-if actionk:
-    for a in actionk:
-        print(a)        
+# WORLD = World('resources/maps/map3.txt')
+# print(WORLD)
+# agent = Agent(WORLD)
+# routine, actionk, shoot = agent.search()
+# count = 0
+# if routine:
+#     for i in routine:
+#         action = [i.wpos]
+#         if i.wpos in shoot:
+#             action.append(shoot[i.wpos])
+#             del shoot[i.wpos]
+#         print(action)
+# if actionk:
+#     for a in actionk:
+#         print(a)
 
 # for row in m.data():
 #     for room in row:

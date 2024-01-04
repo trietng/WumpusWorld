@@ -69,9 +69,6 @@ class Spot:
 
         self.sprite__gold = pygame.transform.scale(self.sprite__gold, (self.width, self.width))
 
-
-
-
     def draw(self, win, grid_start_x, grid_start_y):
         if self.name != '' and self.visited:
             pygame.draw.rect(win, WHITE, (self.x + grid_start_x, self.y + grid_start_y, self.width, self.width))
@@ -181,7 +178,7 @@ class Sprite:
         self.draw_player()
         WIN.blit(self.blit, (self.y + self.grid_start_y, self.x + self.grid_start_x))
 
-    def update(self):
+    def update(self, shoot_coord=None):
         self.velX = 0
         self.velY = 0
 
@@ -225,43 +222,50 @@ class Sprite:
             else:
                 self.velX = self.speed
 
-        corX, corY = 0, 0
+        # corX, corY = 0, 0
+        # print(shoot_coord)
         if self.shoot:
-            if self.status == 'L':
-                corX = -1
-            elif self.status == 'R':
-                corX = 1
-            elif self.status == 'U':
-                corY = -1
-            elif self.status == 'D':
-                corY = 1
-            print("SHOOT " + str(self.x // self.gap + corX) + " " + str(self.y // self.gap + corY))
-            if (self.rows > self.x // self.gap + corX >= 0 and self.columns > self.y // self.gap + corY >= 0
-                    and 'W' in self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY].name):
-                if self.x // self.gap + corX + 1 < self.rows:
-                    self.visual_grid[self.x // self.gap + corX + 1][self.y // self.gap + corY].name.replace('S', '')
-                if self.x // self.gap + corX - 1 >= 0:
-                    self.visual_grid[self.x // self.gap + corX - 1][self.y // self.gap + corY].name.replace('S', '')
-                if self.y // self.gap + corY + 1 < self.columns:
-                    self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY + 1].name.replace('S', '')
-                if self.y // self.gap + corY - 1 >= 0:
-                    self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY - 1].name.replace('S', '')
+            if shoot_coord[0] < shoot_coord[2][0]:
+                self.status = 'U'
+            elif shoot_coord[0] > shoot_coord[2][0]:
+                self.status = 'D'
+            elif shoot_coord[1] < shoot_coord[2][1]:
+                self.status = 'L'
+            elif shoot_coord[1] > shoot_coord[2][1]:
+                self.status = 'R'
 
-
+            if 'W' in self.visual_grid[shoot_coord[0]][shoot_coord[1]].name:
+                print("Shoot coord")
+                print(shoot_coord)
+                if shoot_coord[0] + 1 < self.rows:
+                    self.visual_grid[shoot_coord[0] + 1][shoot_coord[1]].name \
+                        = self.visual_grid[shoot_coord[0] + 1][shoot_coord[1]].name.replace('S', '', 1)
+                    print(self.visual_grid[shoot_coord[0] + 1][shoot_coord[1]].name)
+                if shoot_coord[0] - 1 >= 0:
+                    self.visual_grid[shoot_coord[0] - 1][shoot_coord[1]].name \
+                        = self.visual_grid[shoot_coord[0] - 1][shoot_coord[1]].name.replace('S', '', 1)
+                    print(self.visual_grid[shoot_coord[0] - 1][shoot_coord[1]].name)
+                if shoot_coord[1] + 1 < self.columns:
+                    self.visual_grid[shoot_coord[0]][shoot_coord[1] + 1].name \
+                        = self.visual_grid[shoot_coord[0]][shoot_coord[1] + 1].name.replace('S', '', 1)
+                    print(self.visual_grid[shoot_coord[0]][shoot_coord[1] + 1].name)
+                if shoot_coord[1] - 1 >= 0:
+                    self.visual_grid[shoot_coord[0]][shoot_coord[1] - 1].name \
+                        = self.visual_grid[shoot_coord[0]][shoot_coord[1] - 1].name.replace('S', '', 1)
+                    print(self.visual_grid[shoot_coord[0]][shoot_coord[1] - 1].name)
 
                 # self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY].name.replace('W', '')
 
-
-
-        print(self.velX, self.velY)
+        # print(self.velX, self.velY)
         self.x += self.velX
         self.y += self.velY
         self.set_visited()
-        print(self.x, self.y)
+        # print(self.x, self.y)
 
         self.draw_player()
 
         return False
+
 
 def gap_fn(rows, column):
     if rows >= column:
