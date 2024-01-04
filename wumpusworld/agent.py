@@ -417,6 +417,12 @@ class Agent:
         motions = []
 
         for i in range (1, len(path)):
+            if path[i].percept:
+                if 'K' in path[i].percept and path[i].wpos not in shooted_wumpus:
+                    motions.append(Action.SHOOT)
+                    shooted_wumpus.add(path[i].wpos)
+                    
+            
             # Motion    
             if (path[i-1].pos)[0] < (path[i].pos)[0]:
                 motions.append(Action.MOVE_DOWN)
@@ -428,7 +434,7 @@ class Agent:
                 motions.append(Action.MOVE_LEFT)
                 
             #Action
-            if not path[i].percept:
+            if not path[i].percept: 
                 continue
             
             if 'E' in path[i].percept and path[i].pos not in gold_obtained:
@@ -438,23 +444,18 @@ class Agent:
             # Note: this action including the yelling of the wumpus after it is shooted
             # if a room has both Breeze and Stench, it shoots until a wumpus is dead and go to that room. 
             # temporary
-            if 'B' in path[i].percept:
-                if i != len(path) - 1:
-                    if not path[i+1].percept:
-                        continue
-                    if 'K' in path[i+1].percept and path[i+1].pos not in shooted_wumpus:    
-                        motions.append(Action.SHOOT)
-                        shooted_wumpus.add(path[i+1].pos)
-            # if there is only stench in a room, it shoots once time. Regardless whether any wumpus is dead after be shot or not,
-            # the agent still ensure that the room is safe to go.
-            else:
-                if i != len(path) - 1:
-                    if not path[i+1].percept:
-                        continue
-                    if 'K' in path[i+1].percept and path[i+1].pos not in shooted_wumpus:    
-                        motions.append(Action.SHOOT)
-                        shooted_wumpus.add(path[i+1].pos)
-                    
+            
+                # if not path[i+1].percept:
+                #     if path[i+1].wpos == (6, 3):
+                #         print('AAAA')
+                #     continue
+                # if path[i+1].wpos == (6, 3):
+                #     print('(6, 3)', path[i+1].percept)
+                # if 'K' in path[i+1].percept and path[i+1].wpos not in shooted_wumpus: 
+                #     print("test:  ", path[i+1].wpos)   
+                #     motions.append(Action.SHOOT)
+                #     shooted_wumpus.add(path[i+1].wpos)
+
             if 'W' in path[i].percept:
                 motions.append(Action.EATEN_BY_WUMPUS)
                 
