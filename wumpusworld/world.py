@@ -114,6 +114,7 @@ class WumpusWorld:
         return [self.__world[self.n - i][item - 1] for i in range(1, self.n + 1)]
 
     def __getitem__(self, item):
+        print (item)
         """Get a room at position (x, y).
         :param item: position of the room
         :returns: a string representation of all percepts in the room

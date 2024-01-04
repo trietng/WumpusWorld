@@ -253,8 +253,8 @@ class Agent:
             return True
         if 'G' in room.percept:
             room.percept = room.percept.replace('G', 'E')
-            world.pickup_gold(room.pos)
-            inventory.add(room.pos)
+            world.pickup_gold(room.wpos)
+            inventory.add(room.wpos)
         wadjacents = world.get_adjacents(room.wpos)
         for wadjacent in wadjacents:
             mem.add(room.pos, wadjacent[0], (wadjacent[1], wadjacent[2]))
@@ -512,7 +512,7 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-WORLD = World('resources/maps/map2.txt')
+WORLD = World('resources/maps/map1.txt')
 print(WORLD)
 agent = Agent(WORLD)
 routine, actionk, shoot = agent.search()
