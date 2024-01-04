@@ -128,9 +128,6 @@ class Action(Enum):
 
 
 class Agent:
-    RECURSION_LIMIT = 100
-    RECURSION_COUNT = 0
-
     def __init__(self, world: World):
         self.world = world
         self.current = Room((0, 0), world.agent, 'A', Status.SAFE)
@@ -245,9 +242,6 @@ class Agent:
     @classmethod
     def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot = None):
         """Internal method to search the world."""
-        cls.RECURSION_COUNT += 1
-        if cls.RECURSION_COUNT >= cls.RECURSION_LIMIT:
-            return True
         if room is None:
             return False
         room.percept = world[room.wpos]
