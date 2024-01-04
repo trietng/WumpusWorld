@@ -501,11 +501,13 @@ class Agent:
             routine.append(room[0])
         
         if goal: 
-            path_to_exit = self.find_exit_path(memory, routine[-1], goal)
-            path_to_exit.reverse()
-            routine.extend(path_to_exit)
+
             action = self.convert_to_motions(routine)
             return routine, action, shoot
+        
+        else:
+            
+            print(":( map is unsolvable")
             
         # raw_neighbors = memory.get_nearby((10,3))
         # print("neighbors:  ", raw_neighbors)
