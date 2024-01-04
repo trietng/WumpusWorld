@@ -221,7 +221,7 @@ class Agent:
     def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot):
         """Internal method to shoot the wumpus until it screams."""
         adjacents = mem.get_nearby(room.pos)
-        adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.UNSAFE]
         target = []
         for adjacent in adjacents:
             target.append(adjacent)
@@ -512,21 +512,21 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-# WORLD = World('resources/maps/map2.txt')
-# print(WORLD)
-# agent = Agent(WORLD)
-# routine, actionk, shoot = agent.search()
-# count = 0
-# if routine:
-#     for i in routine:
-#         action = [i.wpos]
-#         if i.wpos in shoot:
-#             action.append(shoot[i.wpos])
-#             del shoot[i.wpos]
-#         print(action)
-# if actionk:
-#     for a in actionk:
-#         print(a)
+WORLD = World('resources/maps/map3.txt')
+print(WORLD)
+agent = Agent(WORLD)
+routine, actionk, shoot = agent.search()
+count = 0
+if routine:
+    for i in routine:
+        action = [i.wpos]
+        if i.wpos in shoot:
+            action.append(shoot[i.wpos]) 
+            del shoot[i.wpos]
+        print(action)
+if actionk:
+    for a in actionk:
+        print(a)        
 
 # for row in m.data():
 #     for room in row:
