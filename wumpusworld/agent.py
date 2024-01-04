@@ -512,7 +512,7 @@ class Agent:
         # routine.extend(path_to_exit)
 
 
-WORLD = World('resources/maps/map2.txt')
+WORLD = World('resources/maps/map3.txt')
 print(WORLD)
 agent = Agent(WORLD)
 routine, actionk, shoot = agent.search()
