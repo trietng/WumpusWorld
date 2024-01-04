@@ -221,7 +221,7 @@ class Agent:
     def __shoot_until_scream(cls, room, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot):
         """Internal method to shoot the wumpus until it screams."""
         adjacents = mem.get_nearby(room.pos)
-        adjacents = [adjacent for adjacent in adjacents if adjacent.status != Status.EXPLORED]
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.UNSAFE]
         target = []
         for adjacent in adjacents:
             target.append(adjacent)
