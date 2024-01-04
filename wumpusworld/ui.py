@@ -1,8 +1,16 @@
-import tkinter
-import tkinter.filedialog
+# Some differences from the data structure used in the UI code:
+# 1. The Grid is a 2D array of spots, with the starting point at the top left corner
+# (0, 0). The coordinate system is (x, y) with x representing the row index and y
+# representing the column index.
+# 2. The world from the project's requirement is a 2D array, with the starting point
+# at the bottom left corner (1, 1). The coordinate system is (i, j) with i
+# representing the row index and j representing the column index.
+# 3. The UI code uses a 2D array of spots to represent the grid, with the starting
+# point at the top left corner (0, 0). The coordinate system is (i, j) with i
+# representing the column index and j representing the row index.
+# To make the UI code work with the world code, we need to convert the coordinate
+# system from (x, y) to (i, j) and vice versa.
 import pygame
-import copy
-import os
 
 pygame.init()
 
@@ -13,7 +21,9 @@ pygame.display.set_caption("Wumpus World")
 
 # Colors:
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 GREY = (128, 128, 128)
+BROWN = (165, 42, 42)
 
 # Fonts:
 font = pygame.font.SysFont('freesansbold', 24)
@@ -26,8 +36,10 @@ class Spot:
     def __init__(self, row, col, width, total_rows, total_cols, name=''):
         self.sprite__gold = None
         self.sprite__pit = None
-        self.sprite__wumpus = None
 
+        self.gap = gap_fn(total_rows, total_cols)
+        self.sprite__wumpus = None
+        self.visited = False
         self.row = row
         self.col = col
         self.x = row * width
@@ -38,7 +50,7 @@ class Spot:
         self.x = col * width
         self.y = row * width
         self.name = name
-        self.color = WHITE
+        self.color = GREY
         self.load_sprite()
 
     def get_pos(self):
@@ -53,28 +65,37 @@ class Spot:
         self.sprite__wumpus = image.copy()
         self.sprite__gold.blit(pygame.image.load('assets/gold.png').convert_alpha(), (0, 0))
         self.sprite__pit.blit(pygame.image.load('assets/pit.png').convert_alpha(), (0, 0))
-        self.sprite__wumpus.blit(pygame.image.load('assets/wumpus.png').convert_alpha(), (0, 0))
+        self.sprite__wumpus.blit(pygame.image.load('assets/rip.png').convert_alpha(), (0, 0))
 
         self.sprite__gold = pygame.transform.scale(self.sprite__gold, (self.width, self.width))
 
-    def is_wumpus(self):
-        return self.name == 'W'
 
-    def is_pit(self):
-        return self.name == 'P'
 
-    def is_gold(self):
-        return self.name == 'G'
 
     def draw(self, win, grid_start_x, grid_start_y):
-        if self.name != '':
-            if self.name == 'P':
+        if self.name != '' and self.visited:
+            pygame.draw.rect(win, WHITE, (self.x + grid_start_x, self.y + grid_start_y, self.width, self.width))
+            if 'P' in self.name:
                 win.blit(self.sprite__pit, (self.x + grid_start_x, self.y + grid_start_y))
-            elif self.name == 'W':
+            elif 'W' in self.name:
                 win.blit(self.sprite__wumpus, (self.x + grid_start_x, self.y + grid_start_y))
-            elif self.name == 'G':
+            elif 'G' in self.name:
                 win.blit(self.sprite__gold, (self.x + grid_start_x, self.y + grid_start_y))
+
+            font_scale = pygame.font.SysFont('freesansbold', int((self.gap / 30) * 12))
+            if 'B' in self.name:
+                text = font_scale.render('Breeze', True, 'red')
+                win.blit(text, (self.x + grid_start_x, self.y + grid_start_y))
+
+            if 'S' in self.name:
+                text = font_scale.render('Stench', True, 'blue')
+                win.blit(text, (self.x + grid_start_x, self.y + grid_start_y + (self.gap / 30) * 12))
+
         else:
+            if self.visited:
+                self.color = WHITE
+            else:
+                self.color = GREY
             pygame.draw.rect(win, self.color, (self.x + grid_start_x, self.y + grid_start_y, self.width, self.width))
 
 
@@ -116,10 +137,11 @@ class Button:
 
 # Player Class
 class Sprite:
+    visual_grid = None
+
     def __init__(self, x, y, rows, columns, grid_start_x, grid_start_y):
         self.blit = None
         self.gap = gap_fn(rows, columns)
-
         self.x = int(x) * self.gap
         self.y = int(y) * self.gap
         self.rows = rows
@@ -133,9 +155,13 @@ class Sprite:
         self.right_pressed = False
         self.up_pressed = False
         self.down_pressed = False
+        self.shoot = False
         self.speed = 0
         self.status = 'R'
         self.spriteSheet = SpriteSheet(pygame.image.load('assets/sprite.png').convert_alpha())
+
+    def set_visited(self):
+        self.visual_grid[self.x // self.gap][self.y // self.gap].visited = True
 
     def get_pos(self):
         return self.x, self.y
@@ -153,7 +179,7 @@ class Sprite:
 
     def draw(self):
         self.draw_player()
-        WIN.blit(self.blit, (self.x + self.grid_start_x, self.y + self.grid_start_y))
+        WIN.blit(self.blit, (self.y + self.grid_start_y, self.x + self.grid_start_x))
 
     def update(self):
         self.velX = 0
@@ -163,31 +189,79 @@ class Sprite:
         if self.left_pressed and not self.right_pressed:
             if self.status != 'L':
                 self.status = 'L'
+                self.set_visited()
+                self.draw_player()
+                # self.update()
+
+                return True
             else:
-                self.velX = -self.speed
+                self.velY = -self.speed
         if self.right_pressed and not self.left_pressed:
             if self.status != 'R':
                 self.status = 'R'
+                self.set_visited()
+                self.draw_player()
+
+                # self.update()
+                return True
             else:
-                self.velX = self.speed
+                self.velY = self.speed
         if self.up_pressed and not self.down_pressed:
             if self.status != 'U':
                 self.status = 'U'
+                self.set_visited()
+                self.draw_player()
+                # self.update()
+                return True
             else:
-                self.velY = -self.speed
+                self.velX = -self.speed
         if self.down_pressed and not self.up_pressed:
             if self.status != 'D':
                 self.status = 'D'
+                self.set_visited()
+                self.draw_player()
+                # self.update()
+                return True
             else:
-                self.velY = self.speed
+                self.velX = self.speed
+
+        corX, corY = 0, 0
+        if self.shoot:
+            if self.status == 'L':
+                corX = -1
+            elif self.status == 'R':
+                corX = 1
+            elif self.status == 'U':
+                corY = -1
+            elif self.status == 'D':
+                corY = 1
+            print("SHOOT " + str(self.x // self.gap + corX) + " " + str(self.y // self.gap + corY))
+            if (self.rows > self.x // self.gap + corX >= 0 and self.columns > self.y // self.gap + corY >= 0
+                    and 'W' in self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY].name):
+                if self.x // self.gap + corX + 1 < self.rows:
+                    self.visual_grid[self.x // self.gap + corX + 1][self.y // self.gap + corY].name.replace('S', '')
+                if self.x // self.gap + corX - 1 >= 0:
+                    self.visual_grid[self.x // self.gap + corX - 1][self.y // self.gap + corY].name.replace('S', '')
+                if self.y // self.gap + corY + 1 < self.columns:
+                    self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY + 1].name.replace('S', '')
+                if self.y // self.gap + corY - 1 >= 0:
+                    self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY - 1].name.replace('S', '')
+
+
+
+                # self.visual_grid[self.x // self.gap + corX][self.y // self.gap + corY].name.replace('W', '')
+
+
 
         print(self.velX, self.velY)
         self.x += self.velX
         self.y += self.velY
+        self.set_visited()
         print(self.x, self.y)
 
         self.draw_player()
 
+        return False
 
 def gap_fn(rows, column):
     if rows >= column:
@@ -213,10 +287,10 @@ def make_grid(rows, column):
 def draw_grid(rows, column, grid_start_x, grid_start_y):
     gap = gap_fn(rows, column)
     for i in range(rows + 1):
-        pygame.draw.line(WIN, GREY, (grid_start_x, grid_start_y + i * gap),
+        pygame.draw.line(WIN, BLACK, (grid_start_x, grid_start_y + i * gap),
                          (grid_start_x + column * gap, grid_start_y + i * gap))
         for j in range(column + 1):
-            pygame.draw.line(WIN, GREY, (j * gap + grid_start_x, grid_start_y),
+            pygame.draw.line(WIN, BLACK, (j * gap + grid_start_x, grid_start_y),
                              (grid_start_x + j * gap, grid_start_y + rows * gap))
 
 
@@ -254,4 +328,23 @@ def draw_menu():
     elif button2.check_clicked():
         command = 2
 
+    return command
+
+
+def draw_menu_ingame():
+    # WIN.fill(WHITE)
+    # WIN.fill('white')
+    command = -1
+    exitButton = Button('Exit Menu', (620, 420))
+    exitButton.draw()
+    scoretxt = font.render('Score: ', True, 'black')
+    WIN.blit(scoretxt, (620, 100))
+
+    button1 = Button('Play game', (620, 180))
+    button1.draw()
+
+    if button1.check_clicked():
+        command = 1
+    elif exitButton.check_clicked():
+        command = 0
     return command

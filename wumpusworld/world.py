@@ -135,6 +135,8 @@ class WumpusWorld:
     def __str__(self):
         return f'N = {self.n}\n' + str(self.__world)
 
+    def get_world(self):
+        return self.__world
     def pickup_gold(self, position):
         if 'G' not in self[position]:
             return False

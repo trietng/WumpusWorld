@@ -2,6 +2,7 @@ import ui
 import pygame
 import game
 
+
 def main():
     run = True
     while run:
@@ -13,7 +14,7 @@ def main():
                 pygame.quit()
             if pygame.MOUSEBUTTONDOWN:
                 if menu_command == 1:
-                    print("Play game")
+                    # print("Play game")
                     game.main()
 
         # pygame.time.delay(100)
