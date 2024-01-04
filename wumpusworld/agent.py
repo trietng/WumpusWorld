@@ -301,8 +301,7 @@ class Agent:
                     return True
             elif 'B' in room.percept:
                 if mem.is_explored():
-                    if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, shoot):
-                        return True
+                    return True
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
                     if len(adjacents) == 0:
@@ -313,7 +312,7 @@ class Agent:
                             return True
             else:
                 for adjacent in adjacents:
-                    if cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
+                    if adjacent.status == Status.SAFE and cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
                         return True
         path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
