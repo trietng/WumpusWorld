@@ -6,6 +6,7 @@ import agent as Agent
 class Visualizer:
     visual_grid = None
     agent = None
+    score = 0
     shot = 0
 
     @staticmethod
@@ -26,8 +27,13 @@ def move_player(player, action, shoot, shoot_keys):
         player.up_pressed = True
     if action == Agent.Action.MOVE_DOWN:
         player.down_pressed = True
-
+    Visualizer.score -= 10
+    if action == Agent.Action.GRAB:
+        Visualizer.score += 1010
+        pygame.time.delay(500)
     is_moved = player.update()
+
+    ui.print_score(Visualizer.score)
 
     # draw
     ui.draw(Visualizer.visual_grid, 10, 10, 0, 0)
@@ -55,7 +61,9 @@ def move_player(player, action, shoot, shoot_keys):
             ui.draw(Visualizer.visual_grid, 10, 10, 0, 0)
             player.draw()
             pygame.display.flip()
-            pygame.time.delay(500)
+            pygame.time.delay(1000)
+            Visualizer.score -= 100
+            ui.print_score(Visualizer.score)
 
         Visualizer.shot += 1
 
@@ -64,6 +72,7 @@ def move_player(player, action, shoot, shoot_keys):
     player.up_pressed = False
     player.down_pressed = False
     player.shoot = False
+
 
 
 def set_world(World):
@@ -130,8 +139,8 @@ def play_game(player, World):
             move_player(player, actionk[i], shoot_list, shoot_keys)
 
 
-def setup_world():
-    World = Agent.World('../resources/maps/map5.txt')
+def setup_world(url):
+    World = Agent.World(url)
     set_world(World)
     # print(World.agent)
     player = ui.Sprite(10 - World.agent[0], World.agent[1] - 1, 10, 10, 0, 0)
@@ -142,13 +151,13 @@ def setup_world():
     return player, World
 
 
-def main():
+def main(url):
     run = True
     visual_grid = ui.make_grid(10, 10)
     Visualizer.visual_grid = visual_grid
 
     # Player Initialization
-    setup_world()
+    setup_world(url)
     play_again = False
 
     while run:
@@ -202,7 +211,8 @@ def main():
                 if command == 1:
                     Visualizer.visual_grid = ui.make_grid(10, 10)
                     Visualizer.shot = 0
-                    player, World = setup_world()
+                    Visualizer.score = 0
+                    player, World = setup_world(url)
                     play_game(player, World)
                     play_again = True
 
@@ -211,6 +221,6 @@ def main():
         # player.draw()
 
         # update
-        pygame.time.delay(100)
+        # pygame.time.delay(1000)
         pygame.display.flip()
         ui.clock.tick(120)

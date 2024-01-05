@@ -362,17 +362,23 @@ def draw_menu():
 
     WIN.blit(text, (135, 127))
     button1 = Button('Play game', (120, 200))
-    button2 = Button('Load Map', (120, 260))
+    # button2 = Button('Load Map', (120, 260))
 
     button1.draw()
-    button2.draw()
+    # button2.draw()
 
     if button1.check_clicked():
         command = 1
-    elif button2.check_clicked():
-        command = 2
+    # elif button2.check_clicked():
+    #     command = 2
 
     return command
+
+
+def print_score(score):
+    pygame.draw.rect(WIN, 'white', [620, 100, 260, 40], 0, 5)
+    scoretxt = font.render('Score: ' + str(score), True, 'black')
+    WIN.blit(scoretxt, (620, 100))
 
 
 def draw_menu_ingame():
@@ -381,8 +387,8 @@ def draw_menu_ingame():
     command = -1
     exitButton = Button('Exit Menu', (620, 420))
     exitButton.draw()
-    scoretxt = font.render('Score: ', True, 'black')
-    WIN.blit(scoretxt, (620, 100))
+    # scoretxt = font.render('Score: ', True, 'black')
+    # WIN.blit(scoretxt, (620, 100))
 
     button1 = Button('Play game', (620, 180))
     button1.draw()
