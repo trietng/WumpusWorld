@@ -227,17 +227,22 @@ class Agent:
             target.append(adjacent)
             scream = world.kill_wumpus(target[-1].wpos)
             room.percept = world[room.wpos]
+            if 'B' not in room.percept:
+                target[-1].status = Status.SAFE
             if scream:
                 cls.remove_wumpus(kb, f'W{target[-1].pos}')
+                target[-1].status = Status.SAFE
                 if 'S' not in room.percept:
                     cls.update(kb, room, mem.get_nearby(room.pos))
-                    for t in target:
-                        t.status = Status.SAFE
+                    
                     if room.wpos not in shoot:
                         shoot[room.wpos] = [t.wpos for t in target]
                     break
-        if cls.__search(target[-1], room, path, mem, inventory, world, kb, shoot):
-            return True
+        adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
+        for adjacent in adjacents:
+            
+            if adjacent.status == Status.SAFE and cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
+                return True
 
     @classmethod
     def __search(cls, room: Room, parent, path: deque, mem: Map, inventory: set, world: World, kb: KnowledgeBase, shoot = None):
@@ -308,7 +313,8 @@ class Agent:
                 for adjacent in adjacents:
                     if adjacent.status == Status.SAFE and cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
                         return True
-        path.append((parent, parent.wpos, deepcopy(parent.percept)))
+        if parent != None:
+            path.append((parent, parent.wpos, deepcopy(parent.percept)))
         return False
 
     def manhattan_heuristic(self, pos1, pos2):
@@ -491,6 +497,8 @@ class Agent:
                 if 'S' in room[0].percept:
                     stench_room.append(room[0])
             routine.append(room[0])
+            
+        print("SHOOT: ", shoot)
         
         if goal: 
             path_to_exit = self.find_exit_path(memory, routine[-1], goal)
