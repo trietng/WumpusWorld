@@ -10,7 +10,7 @@ HCMUS - CS420
 
 - Nguyen Si Minh 21125081
 
-- Nguyen Dinh Triet 21125089
+- Nguyen Dinh Triet 21125097
 
 
 # Links:
