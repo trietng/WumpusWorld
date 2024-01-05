@@ -1,9 +1,9 @@
 # Some differences from the data structure used in the UI code:
-# 1. The Grid is a 2D array of spots, with the starting point at the top left corner
+# 1. The Grid is a 2D array of spots, with the starting point in the top left corner
 # (0, 0). The coordinate system is (x, y) with x representing the row index and y
 # representing the column index.
 # 2. The world from the project's requirement is a 2D array, with the starting point
-# at the bottom left corner (1, 1). The coordinate system is (i, j) with i
+# in the bottom left corner (1, 1). The coordinate system is (i, j) with i
 # representing the row index and j representing the column index.
 # 3. The UI code uses a 2D array of spots to represent the grid, with the starting
 # point at the top left corner (0, 0). The coordinate system is (i, j) with i
@@ -11,6 +11,7 @@
 # To make the UI code work with the world code, we need to convert the coordinate
 # system from (x, y) to (i, j) and vice versa.
 import pygame
+import re
 
 pygame.init()
 
@@ -34,6 +35,11 @@ clock = pygame.time.Clock()
 
 class Spot:
     def __init__(self, row, col, width, total_rows, total_cols, name=''):
+        self.sprite__arrow_down = None
+        self.sprite__arrow_up = None
+        self.sprite__arrow_right = None
+        self.sprite__arrow = None
+        self.sprite__arrow_left = None
         self.sprite__gold = None
         self.sprite__pit = None
 
@@ -52,6 +58,7 @@ class Spot:
         self.name = name
         self.color = GREY
         self.load_sprite()
+        self.shoot = False
 
     def get_pos(self):
         return self.row, self.col
@@ -63,13 +70,19 @@ class Spot:
         self.sprite__gold = image.copy()
         self.sprite__pit = image.copy()
         self.sprite__wumpus = image.copy()
+        self.sprite__arrow = image.copy()
         self.sprite__gold.blit(pygame.image.load('assets/gold.png').convert_alpha(), (0, 0))
         self.sprite__pit.blit(pygame.image.load('assets/pit.png').convert_alpha(), (0, 0))
         self.sprite__wumpus.blit(pygame.image.load('assets/rip.png').convert_alpha(), (0, 0))
-
+        self.sprite__arrow.blit(pygame.image.load('assets/arrow.png').convert_alpha(), (0, 0))
+        self.sprite__arrow_left = pygame.transform.rotate(self.sprite__arrow, 0)
+        self.sprite__arrow_right = pygame.transform.rotate(self.sprite__arrow, 180)
+        self.sprite__arrow_up = pygame.transform.rotate(self.sprite__arrow, 270)
+        self.sprite__arrow_down = pygame.transform.rotate(self.sprite__arrow, 90)
         self.sprite__gold = pygame.transform.scale(self.sprite__gold, (self.width, self.width))
 
     def draw(self, win, grid_start_x, grid_start_y):
+
         if self.name != '' and self.visited:
             pygame.draw.rect(win, WHITE, (self.x + grid_start_x, self.y + grid_start_y, self.width, self.width))
             if 'P' in self.name:
@@ -78,6 +91,7 @@ class Spot:
                 win.blit(self.sprite__wumpus, (self.x + grid_start_x, self.y + grid_start_y))
             elif 'G' in self.name:
                 win.blit(self.sprite__gold, (self.x + grid_start_x, self.y + grid_start_y))
+                self.name = self.name.replace('G', '', 1)
 
             font_scale = pygame.font.SysFont('freesansbold', int((self.gap / 30) * 12))
             if 'B' in self.name:
@@ -88,12 +102,33 @@ class Spot:
                 text = font_scale.render('Stench', True, 'blue')
                 win.blit(text, (self.x + grid_start_x, self.y + grid_start_y + (self.gap / 30) * 12))
 
+        elif 'W' in self.name and self.shoot == True:
+            win.blit(self.sprite__wumpus, (self.x + grid_start_x, self.y + grid_start_y))
+            self.shoot = False
         else:
             if self.visited:
                 self.color = WHITE
             else:
                 self.color = GREY
             pygame.draw.rect(win, self.color, (self.x + grid_start_x, self.y + grid_start_y, self.width, self.width))
+
+            if 'O' in self.name:
+                direction = ''
+                if 'OU' in self.name:
+                    win.blit(self.sprite__arrow_up, (self.x + grid_start_x, self.y + grid_start_y))
+                    direction = 'U'
+                elif 'OD' in self.name:
+                    win.blit(self.sprite__arrow_down, (self.x + grid_start_x, self.y + grid_start_y))
+                    direction = 'D'
+                elif 'OL' in self.name:
+                    win.blit(self.sprite__arrow_left, (self.x + grid_start_x, self.y + grid_start_y))
+                    direction = 'L'
+                elif 'OR' in self.name:
+                    win.blit(self.sprite__arrow_right, (self.x + grid_start_x, self.y + grid_start_y))
+                    direction = 'R'
+                print(self.name)
+                self.name = self.name.replace(f'O{direction}', '', 1)
+                self.shoot = True
 
 
 # SpriteSheet Class
@@ -224,15 +259,20 @@ class Sprite:
 
         # corX, corY = 0, 0
         # print(shoot_coord)
+        # Shoot = O*
         if self.shoot:
             if shoot_coord[0] < shoot_coord[2][0]:
                 self.status = 'U'
+                self.visual_grid[shoot_coord[0]][shoot_coord[1]].name += 'OU'
             elif shoot_coord[0] > shoot_coord[2][0]:
                 self.status = 'D'
+                self.visual_grid[shoot_coord[0]][shoot_coord[1]].name += 'OD'
             elif shoot_coord[1] < shoot_coord[2][1]:
                 self.status = 'L'
+                self.visual_grid[shoot_coord[0]][shoot_coord[1]].name += 'OL'
             elif shoot_coord[1] > shoot_coord[2][1]:
                 self.status = 'R'
+                self.visual_grid[shoot_coord[0]][shoot_coord[1]].name += 'OR'
 
             if 'W' in self.visual_grid[shoot_coord[0]][shoot_coord[1]].name:
                 print("Shoot coord")
