@@ -60,10 +60,11 @@ def move_player(player, action, shoot, shoot_keys):
             # draw
             ui.draw(Visualizer.visual_grid, 10, 10, 0, 0)
             player.draw()
-            pygame.display.flip()
-            pygame.time.delay(1000)
             Visualizer.score -= 100
             ui.print_score(Visualizer.score)
+            pygame.display.flip()
+            pygame.time.delay(1000)
+
 
         Visualizer.shot += 1
 
@@ -215,7 +216,7 @@ def main(url):
                 if command == 1:
                     Visualizer.visual_grid = ui.make_grid(10, 10)
                     Visualizer.shot = 0
-                    Visualizer.score = 0
+                    Visualizer.score = 10
                     player, World = setup_world(url)
                     play_game(player, World)
                     play_again = True
