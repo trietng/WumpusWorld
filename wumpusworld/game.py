@@ -113,6 +113,8 @@ def set_world(World):
         print('\n')
 
 
+
+
 def play_game(player, World):
     agent = Agent.Agent(World)
 
@@ -138,6 +140,8 @@ def play_game(player, World):
         for i in range(len(actionk)):
             move_player(player, actionk[i], shoot_list, shoot_keys)
 
+    Visualizer.score += 10
+    ui.print_score(Visualizer.score)
 
 def setup_world(url):
     World = Agent.World(url)
