@@ -215,7 +215,7 @@ def main(url):
                 if command == 1:
                     Visualizer.visual_grid = ui.make_grid(10, 10)
                     Visualizer.shot = 0
-                    Visualizer.score = 0
+                    Visualizer.score = 10
                     player, World = setup_world(url)
                     play_game(player, World)
                     play_again = True
