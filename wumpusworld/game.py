@@ -1,7 +1,7 @@
 import ui
 import pygame
 import agent as Agent
-
+import time
 
 class Visualizer:
     visual_grid = None
@@ -119,8 +119,11 @@ def set_world(World):
 def play_game(player, World):
     agent = Agent.Agent(World)
 
+    start = time.time()
     routine, actionk, shoot = agent.search()
-    
+    end = time.time()
+    print('Exec time: ', end - start)
+
     count = 0
     move = []
     shoot_list = list(shoot.values())
