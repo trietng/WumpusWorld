@@ -12,7 +12,16 @@ HCMUS - CS420
 
 - Nguyen Dinh Triet 21125089
 
-
+# Run instruction:
+Install the graphical library:
+```
+pip install pygame 
+```
+Run the game:
+```
+python ./wumpusworld/main.py
+```
+Maps are stored at `resources/maps` folder. The program came with a built-in file picker, so you can choose any map you want.
 # Links:
 
 - Drive: https://drive.google.com/drive/folders/1Rh-PvHFay9-Zqw3-FvuVi77P_b79k-0E?usp=sharing
