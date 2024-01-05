@@ -120,6 +120,7 @@ def play_game(player, World):
     agent = Agent.Agent(World)
 
     routine, actionk, shoot = agent.search()
+    
     count = 0
     move = []
     shoot_list = list(shoot.values())

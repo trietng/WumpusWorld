@@ -287,8 +287,13 @@ class Agent:
                 adjacent.status = Status.SAFE
         if len(adjacents) == 0:
             if not mem.is_explored():
-                path.append((parent, parent.wpos, deepcopy(parent.percept)))
-                return False
+                nextad = cls.ucs(mem, room, parent, path)   
+                if nextad != None:
+                    if cls.__search(nextad[0], nextad[1], path, mem, inventory, world, kb, shoot):          
+                        return True
+                else:
+                    path.append((parent, parent.wpos, deepcopy(parent.percept)))
+                    return False
             else:
                 return True
         else:
@@ -304,8 +309,13 @@ class Agent:
                 else:
                     adjacents = [adjacent for adjacent in adjacents if adjacent.status == Status.SAFE]
                     if len(adjacents) == 0:
-                        path.append((parent, parent.wpos, deepcopy(parent.percept)))
-                        return False
+                        next_room = cls.ucs(mem, room, parent, path)  
+                        if next_room != None:
+                            if cls.__search(next_room[0], next_room[1], path, mem, inventory, world, kb, shoot):            
+                                return True
+                        else:
+                            path.append((parent, parent.wpos, deepcopy(parent.percept)))
+                            return False
                     else:
                         if cls.__search(adjacents[0], room, path, mem, inventory, world, kb, shoot):
                             return True
@@ -314,13 +324,80 @@ class Agent:
                     if adjacent.status == Status.SAFE and cls.__search(adjacent, room, path, mem, inventory, world, kb, shoot):
                         return True
         if parent != None:
-            path.append((parent, parent.wpos, deepcopy(parent.percept)))
-        return False
+            next_res = cls.ucs(mem, room, parent, path) 
+            if next_res != None:
+                if cls.__search(next_res[0], next_res[1], path, mem, inventory, world, kb, shoot):
+                    return True     
+            else:
+                path.append((parent, parent.wpos, deepcopy(parent.percept)))
+                return False           
+        return True
+    
+    @classmethod
+    def ucs(cls, map: Map, init_room: Room, parent_init_room: Room, path: deque):
+        frontier = PriorityQueue()
+        frontier.put((0, init_room.pos))
+        
+        map_data = map.data()
+        
+        visited = set()
+        paths = {}
+        paths[init_room] = None
+        safe_room = None
+        
+        while not frontier.empty():
+            cost, room_pos = frontier.get_nowait()
+            room = map.__getitem__(room_pos)
+            
+            if room.status == Status.SAFE:
+                safe_room = room
+                break
+            
+            if room in visited:
+                continue
+            visited.add(room)
 
-    def manhattan_heuristic(self, pos1, pos2):
+            raw_neighbors = map.get_nearby(room_pos)
+            neighbors = []
+            for row in map_data:
+                for neighborroom in row:
+                    if neighborroom in raw_neighbors:
+                        if neighborroom.status == Status.EXPLORED or neighborroom.status == Status.SAFE:
+                            neighbors.append(neighborroom)
+                                
+            for neighbor in neighbors:
+                if neighbor in visited:
+                    continue
+                paths[neighbor] = room
+                frontier.put((cost + 1, neighbor.pos))
+    
+        back_room = safe_room
+        if back_room != None:
+            reverse_path = []
+            while back_room != None:
+                reverse_path.append([back_room, paths[back_room]])
+                back_room = paths[back_room]
+            reverse_path.reverse()
+            for pathe in reverse_path:
+                if pathe == reverse_path[0]:
+                    continue
+                if pathe == reverse_path[-1]:
+                    break
+                if pathe[1] == None:
+                    path.append((pathe[0], parent_init_room, deepcopy(pathe[0].percept)))
+                else:
+                    path.append((pathe[0], pathe[1], deepcopy(pathe[0].percept)))
+            return reverse_path[-1]
+        else:
+            return None
+
+
+    @classmethod
+    def manhattan_heuristic(cls, pos1, pos2):
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-    def find_exit_path(self, map: Map, agent_pos: Room, goal_pos: Room):
+    @classmethod
+    def Astar(cls, map: Map, agent_pos: Room, goal_pos: Room):
         '''
         This function using A* search with Manhattan heuristic function to find out the shortest path for agent to
         get the exit room, whenever it has discovered the whole map or there is no safe way to continue the discovery.
@@ -337,7 +414,7 @@ class Agent:
         '''
 
         frontier = PriorityQueue()
-        frontier.put((self.manhattan_heuristic(agent_pos.wpos, goal_pos.wpos), (0, agent_pos.pos)))
+        frontier.put((cls.manhattan_heuristic(agent_pos.wpos, goal_pos.wpos), (0, agent_pos.pos)))
 
         map_data = map.data()
 
@@ -362,20 +439,20 @@ class Agent:
             for row in map_data:
                 for room in row:
                     if room in raw_neighbors:
-                        if room.percept != None:
-                            if room.percept == '' or 'G' in room.percept or 'B' in room.percept or 'S' in room.percept or 'E' in room.percept or 'K' in room.percept:
-                                neighbors.append(room)
+                        if room.status == Status.EXPLORED:
+                            neighbors.append(room)
 
             for neighbor in neighbors:
                 if neighbor in visited:
                     continue
                 path[neighbor] = agent
-                frontier.put((cost + self.manhattan_heuristic(neighbor.wpos, goal_pos.wpos) + 1, (cost + 1, neighbor.pos)))
-        routine = self.extract_final_path(path, goal_pos)
+                frontier.put((cost + cls.manhattan_heuristic(neighbor.wpos, goal_pos.wpos) + 1, (cost + 1, neighbor.pos)))
+        routine = cls.extract_final_path(path, goal_pos)
 
         return routine
 
-    def extract_final_path(self, path, goal):
+    @classmethod
+    def extract_final_path(cls, path, goal):
         routine = []
 
         pos = goal
@@ -487,6 +564,7 @@ class Agent:
         stench_breeze_room = []
         breeze_room = []
         for room in path:
+            # print("PATH: ", room[0].wpos)
             if (room[0].wpos == (1,1)):
                 goal = room[0]
             if 'B' in room[0].percept and 'S' in room[0].percept:
@@ -501,7 +579,7 @@ class Agent:
         print("SHOOT: ", shoot)
         
         if goal: 
-            path_to_exit = self.find_exit_path(memory, routine[-1], goal)
+            path_to_exit = self.Astar(memory, routine[-1], goal)
             path_to_exit.reverse()
             routine.extend(path_to_exit)
             action = self.convert_to_motions(routine, shoot)
