@@ -25,8 +25,8 @@ def main():
             if pygame.MOUSEBUTTONDOWN:
                 if menu_command == 1:
                     # print("Play game")
-                    url = prompt_file()
-                    # url = '../resources/maps/map1.txt'
+                    # url = prompt_file()
+                    url = '../resources/maps/map1.txt'
                     game.main(url)
 
         # pygame.time.delay(100)
